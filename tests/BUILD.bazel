@@ -1,0 +1,54 @@
+package(default_visibility = ["//visibility:public"])
+
+load("@rules_python//python:defs.bzl", "py_test")
+
+filegroup(
+    name = "testdata",
+    srcs = glob(["files/**"]),
+)
+
+# TODO this test invokes make, not complete yet still passes
+py_test(
+    name = "test_command_line",
+    srcs = ["test_command_line.py"],
+    deps = [
+        "//cantools:cantools",
+    ],
+    data = [":testdata"],
+)
+
+py_test(
+    name = "test_database",
+    srcs = ["test_database.py"],
+    deps = [
+        "//cantools:cantools",
+    ],
+    data = [":testdata"],
+)
+
+py_test(
+    name = "test_diagnostics_database",
+    srcs = ["test_diagnostics_database.py"],
+    deps = [
+        "//cantools:cantools",
+    ],
+    data = [":testdata"],
+)
+
+py_test(
+    name = "test_monitor",
+    srcs = ["test_monitor.py"],
+    deps = [
+        "//cantools:cantools",
+    ],
+    data = [":testdata"],
+)
+
+py_test(
+    name = "test_tester",
+    srcs = ["test_tester.py"],
+    deps = [
+        "//cantools:cantools",
+    ],
+    data = [":testdata"],
+)
