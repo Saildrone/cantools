@@ -1,0 +1,35 @@
+package(default_visibility = ["//visibility:public"])
+
+load("//:index.bzl", "generate_c")
+
+filegroup(
+    name = "vehicle_dbc",
+    srcs = ["//tests:files/dbc/vehicle.dbc"],
+)
+
+# bazel build //examples/generate_c:test_generate_c_single
+generate_c(
+    name = "test_generate_c_single",
+    dbcs = [
+        ":vehicle_dbc",
+    ],
+    args = ["-f"],
+)
+
+# Assortment of DBC files that pass `cantools generate_c_source`
+filegroup(
+    name = "dbcs",
+    srcs = [
+        "//tests:files/dbc/j1939.dbc",
+        "//tests:files/dbc/timing.dbc",
+        "//tests:files/dbc/vehicle.dbc",
+    ],
+)
+
+# bazel build //examples/generate_c:test_generate_c
+generate_c(
+    name = "test_generate_c",
+    dbcs = [
+        ":dbcs",
+    ],
+)
