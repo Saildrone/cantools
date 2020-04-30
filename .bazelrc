@@ -1,3 +1,6 @@
+# Build opt by default
+build -c opt
+
 # Force python to py3 and build zips
 build --build_python_zip --host_force_python=PY3
 

@@ -36,12 +36,14 @@ def _main():
     from .subparsers import dump
     from .subparsers import convert
     from .subparsers import generate_c_source
+    from .subparsers import generate_cpp_source
 
     decode.add_subparser(subparsers)
     monitor.add_subparser(subparsers)
     dump.add_subparser(subparsers)
     convert.add_subparser(subparsers)
     generate_c_source.add_subparser(subparsers)
+    generate_cpp_source.add_subparser(subparsers)
 
     args = parser.parse_args()
 
