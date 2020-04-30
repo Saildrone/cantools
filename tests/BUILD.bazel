@@ -1,5 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
+load("//:index.bzl", "generate_cpp")
 load("@rules_python//python:defs.bzl", "py_test")
 
 filegroup(
@@ -51,4 +52,39 @@ py_test(
         "//cantools:cantools",
     ],
     data = [":testdata"],
+)
+
+
+filegroup(
+    name = "generate_cpp_dbc_fg",
+    srcs = [
+        "//tests:files/dbc/j1939.dbc",
+        "//tests:files/dbc/motohawk.dbc",
+    ],
+)
+
+generate_cpp(
+    name = "gen_cpp_dbc",
+    dbcs = [":generate_cpp_dbc_fg"],
+)
+
+cc_library(
+    name = "gen_cpp_dbc_lib",
+    srcs = [
+        ":gen_cpp_dbc",
+    ],
+    includes = ["."],
+)
+
+cc_test(
+    name = "test_generate_cpp",
+    srcs = [
+        "test_generate_cpp.cpp",
+        # "aamotohawk.cc",
+        # "aamotohawk.h",
+    ],
+    deps = [
+        ":gen_cpp_dbc_lib",
+        "@com_google_googletest//:gtest",
+    ],
 )

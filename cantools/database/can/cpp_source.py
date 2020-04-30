@@ -107,7 +107,9 @@ public:
     }}
   
     // Clear buffer
-    void clear();
+    void clear() {{
+        memset(_buffer, 0, _buffer_size);
+    }}
 
 {members}
 
