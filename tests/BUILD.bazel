@@ -80,8 +80,6 @@ cc_test(
     name = "test_generate_cpp",
     srcs = [
         "test_generate_cpp.cpp",
-        # "aamotohawk.cc",
-        # "aamotohawk.h",
     ],
     deps = [
         ":gen_cpp_dbc_lib",

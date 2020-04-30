@@ -558,6 +558,7 @@ def _generate_signal_encode_decode_declaration(signal):
         name=signal.name)
 
 
+# TODO unused - re-implement if supporting signal multiplexing is desired
 def _format_pack_code_mux(message,
                           mux,
                           body_lines_per_index,
@@ -645,6 +646,7 @@ def _format_pack_code(message):
                                    message.signal_tree)
 
 
+# TODO unused - re-implement if supporting signal multiplexing is desired
 def _format_unpack_code_mux(message,
                             mux,
                             body_lines_per_index,
@@ -722,6 +724,7 @@ def _format_unpack_code_signal(message,
 
     return pack_content + '\n'.join(body_lines) 
 
+
 def _format_unpack_code_level(message,
                               signal_names):
     """Format one unpack level in a signal tree.
@@ -769,6 +772,7 @@ def _generate_message_declaration(message):
     return comment, members, encode_decode_members
 
 
+# TODO signal choices not implemented, should support??
 def _format_choices(signal, signal_name):
     choices = []
 
@@ -876,6 +880,7 @@ def _generate_is_in_range(message):
     return checks
 
 
+# TODO signal choices not implemented, should support??
 def _generate_choices_defines(database_name, messages):
     choices_defines = []
 

@@ -59,14 +59,4 @@ private:
 
     // Message cycle time [ms]
     uint32_t _cycle_time {};
-
-    // Signals - set of signal names
-    // std::set<std::string> _signals {};
-
-    // Transmitters
-    // std::set<std::string> _transmitters {};
-
-    // Signal groups - do we want this
-    // std::unordered_map<std::string, SignalGroup> _signal_groups {};
-
 };
