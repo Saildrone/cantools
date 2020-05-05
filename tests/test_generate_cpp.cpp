@@ -12,9 +12,9 @@ TEST(motohawk_dbc, struct_unpack) {
     ExampleMessage m(buffer, 8u);
 
     // Confirm unpacking values is successful
-    EXPECT_EQ(1, m.Enable.raw());
-    EXPECT_EQ(32, m.AverageRadius.raw());
-    EXPECT_EQ(55, m.Temperature.raw());
+    EXPECT_EQ(1, m.Enable.Raw());
+    EXPECT_EQ(32, m.AverageRadius.Raw());
+    EXPECT_EQ(55, m.Temperature.Raw());
 
     // Confirm buffer to_string() accuracy
     auto str = m.to_string();
@@ -41,27 +41,30 @@ TEST(motohawk_dbc, struct_pack) {
 
     // Set Enable and confirm
     EXPECT_TRUE(m.set_Enable(1));
-    EXPECT_EQ(1, m.Enable.real());
+    EXPECT_EQ(1, m.Enable.Real());
 
     // Set Radius and confirm Enable and AverageRadius signals
     EXPECT_TRUE(m.set_AverageRadius(0.5));
-    EXPECT_EQ(1, m.Enable.real());
-    EXPECT_EQ(0.5, m.AverageRadius.real());
+    EXPECT_EQ(1, m.Enable.Real());
+    EXPECT_EQ(0.5, m.AverageRadius.Real());
 
     // Set Temperature and confirm Enable, AverageRadius, and Temperature signals
     EXPECT_TRUE(m.set_Temperature(250));
-    EXPECT_EQ(1, m.Enable.real());
-    EXPECT_EQ(0.5, m.AverageRadius.real());
-    EXPECT_EQ(250, m.Temperature.real());
+    EXPECT_EQ(1, m.Enable.Real());
+    EXPECT_EQ(0.5, m.AverageRadius.Real());
+    EXPECT_EQ(250, m.Temperature.Real());
 }
 
 TEST(signed_dbc, struct_pack) {
     Message64 m;
 
     EXPECT_TRUE(m.set_s64(-5));
-    EXPECT_EQ(-5, m.s64.raw());
-    EXPECT_EQ(-5, m.s64.real());
+    EXPECT_EQ(-5, m.s64.Raw());
+    EXPECT_EQ(-5, m.s64.Real());
     EXPECT_EQ("fbffffffffffffff", m.to_string());
+
+    m.clear();
+    EXPECT_EQ("0000000000000000", m.to_string());
 }
 
 TEST(css__electronics_sae_j1939_demo, spns) {

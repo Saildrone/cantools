@@ -104,8 +104,8 @@ class {message_name}_{name} : public Signal<{type_name}, double> {{
 public:
     {message_name}_{name}(const uint8_t* buffer);
 
-    virtual {type_name} raw() override;
-    virtual bool raw_in_range(const {type_name}& value) const override;
+    virtual {type_name} Raw() override;
+    virtual bool RawInRange(const {type_name}& value) const override;
 }};
 '''
 
@@ -152,10 +152,8 @@ public:
     }}
   
     // Clear buffer
-    // This function invalidates references to the underlying buffer, external ownership invalidated
     void clear() {{
-        _buffer_ptr.reset(new uint8_t[_buffer_size]);
-        _buffer = _buffer_ptr.get();
+        std::fill_n(_buffer, _buffer_size, 0u);
     }}
 
 {signal_setters}
@@ -188,14 +186,14 @@ SIGNAL_DEFINITION_FMT = '''\
 '''
 
 SIGNAL_DEFINITION_RAW_FMT = '''\
-{type_name} {message_name}_{name}::raw() {{
+{type_name} {message_name}_{name}::Raw() {{
 {contents}
 }}
 
 '''
 
 SIGNAL_DEFINITION_RAW_IN_RANGE_FMT = '''\
-bool {message_name}_{name}::raw_in_range(const {type_name}& value) const {{
+bool {message_name}_{name}::RawInRange(const {type_name}& value) const {{
     return ({check});
 }}
 '''
@@ -316,13 +314,13 @@ def _format_pack_code_mux(message,
 def _format_pack_code_signal(message,
                              signal_name):
     signal = message.get_signal_by_name(signal_name)
-    fmt = '\tuint{}_t {}_encoded = {}.encode(value);\n'
+    fmt = '\tuint{}_t {}_encoded = {}.Encode(value);\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
                               signal.name)
 
     body_lines = []
-    body_lines.append(f'\tif (!{signal.name}.raw_in_range({signal.snake_name}_encoded)) {{\n\t\treturn false;\n\t}}')
+    body_lines.append(f'\tif (!{signal.name}.RawInRange({signal.snake_name}_encoded)) {{\n\t\treturn false;\n\t}}')
 
     for index, shift, shift_direction, mask in signal.segments(invert_shift=False):
         fmt = '\t_buffer[{}] |= pack_{}_shift<uint{}_t>({}_encoded, {}u, 0x{:02x}u);'

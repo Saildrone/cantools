@@ -109,29 +109,29 @@ public:
     {}
 
     /** Unpack signal from buffer */
-    virtual RawDataType raw() = 0;
+    virtual RawDataType Raw() = 0;
 
     /** Confirm if raw signal within acceptable range */
-    virtual bool raw_in_range(const RawDataType& value) const = 0;
+    virtual bool RawInRange(const RawDataType& value) const = 0;
 
     /** Unpacked signal from buffer, decoded and converted to physical engineering units */
-    PhysicalDataType real() {
-        return decode(raw());
+    PhysicalDataType Real() {
+        return Decode(Raw());
     }
 
     /** Confirm if physical engineering units value in range */
-    bool in_range(const PhysicalDataType& value) {
-        RawDataType enable = encode(value);
-        return raw_in_range(enable);
+    bool InRange(const PhysicalDataType& value) {
+        RawDataType enable = Encode(value);
+        return RawInRange(enable);
     }
 
     /** Decode given signal by applying scaling and offset. */
-    PhysicalDataType decode(RawDataType value) const {
+    PhysicalDataType Decode(RawDataType value) const {
         return ((static_cast<PhysicalDataType>(value) * _scale_factor) + _offset);
     }
 
     /** Encode given signal by applying scaling and offset. */
-    RawDataType encode(PhysicalDataType value) const {
+    RawDataType Encode(PhysicalDataType value) const {
         return static_cast<RawDataType>((value - _offset) / _scale_factor);
     }
 
