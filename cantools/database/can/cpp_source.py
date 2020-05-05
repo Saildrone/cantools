@@ -314,16 +314,16 @@ def _format_pack_code_mux(message,
 def _format_pack_code_signal(message,
                              signal_name):
     signal = message.get_signal_by_name(signal_name)
-    fmt = '\tuint{}_t {}_encoded = {}.Encode(value);\n'
+    fmt = '    uint{}_t {}_encoded = {}.Encode(value);\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
                               signal.name)
 
     body_lines = []
-    body_lines.append(f'\tif (!{signal.name}.RawInRange({signal.snake_name}_encoded)) {{\n\t\treturn false;\n\t}}')
+    body_lines.append(f'    if (!{signal.name}.RawInRange({signal.snake_name}_encoded)) {{\n        return false;\n    }}')
 
     for index, shift, shift_direction, mask in signal.segments(invert_shift=False):
-        fmt = '\t_buffer[{}] |= pack_{}_shift<uint{}_t>({}_encoded, {}u, 0x{:02x}u);'
+        fmt = '    _buffer[{}] |= pack_{}_shift<uint{}_t>({}_encoded, {}u, 0x{:02x}u);'
         line = fmt.format(index,
                           shift_direction,
                           signal.type_length,
@@ -331,7 +331,7 @@ def _format_pack_code_signal(message,
                           shift,
                           mask)
         body_lines.append(line)
-    body_lines.append('\treturn true;')
+    body_lines.append('    return true;')
     return pack_content + '\n'.join(body_lines) 
 
 
@@ -399,7 +399,7 @@ def _format_unpack_code_signal(message,
                                signal_name):
     signal = message.get_signal_by_name(signal_name)
     conversion_type_name = 'uint{}_t'.format(signal.type_length)
-    fmt = '\tuint{}_t {} = 0{};\n'
+    fmt = '    uint{}_t {} = 0{};\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
                               signal.conversion_type_suffix)
@@ -466,8 +466,8 @@ def _generate_message_declaration(message):
 
     for signal in message.signals:
         signal_constructors.append(_generate_signal_declaration(signal, message.name))
-        signal_setters.append(f'\tbool set_{signal.name}(const double& value);')
-        signals.append(f'\t{message.name}_{signal.name} {signal.name};')
+        signal_setters.append(f'    bool set_{signal.name}(const double& value);')
+        signals.append(f'    {message.name}_{signal.name} {signal.name};')
 
     if message.comment is None:
         comment = ''
@@ -626,7 +626,7 @@ def _generate_definitions(database_name, messages):
         for signal_iter, signal in enumerate(message.signals):
             signal_definition = f'// Signal {message.name}.{signal.name}\n'
 
-            signals_in_msg_constructor.append(f'\t, {signal.name}(_buffer)')
+            signals_in_msg_constructor.append(f'    , {signal.name}(_buffer)')
 
             signal_definition += SIGNAL_DEFINITION_FMT.format(
                 name=signal.name,
