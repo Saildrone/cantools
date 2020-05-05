@@ -58,8 +58,9 @@ py_test(
 filegroup(
     name = "generate_cpp_dbc_fg",
     srcs = [
-        "//tests:files/dbc/j1939.dbc",
+        "//tests:files/dbc/CSS-Electronics-SAE-J1939-DEMO.dbc",
         "//tests:files/dbc/motohawk.dbc",
+        "//tests:files/dbc/signed.dbc",
     ],
 )
 

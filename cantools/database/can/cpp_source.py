@@ -316,16 +316,16 @@ def _format_pack_code_mux(message,
 def _format_pack_code_signal(message,
                              signal_name):
     signal = message.get_signal_by_name(signal_name)
-    fmt = '\tuint{}_t {} = {}.encode(value);\n'
+    fmt = '\tuint{}_t {}_encoded = {}.encode(value);\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
                               signal.name)
 
     body_lines = []
-    body_lines.append(f'\tif (!{signal.name}.raw_in_range({signal.snake_name})) {{\n\t\treturn false;\n\t}}')
+    body_lines.append(f'\tif (!{signal.name}.raw_in_range({signal.snake_name}_encoded)) {{\n\t\treturn false;\n\t}}')
 
     for index, shift, shift_direction, mask in signal.segments(invert_shift=False):
-        fmt = '\t_buffer[{}] |= pack_{}_shift<uint{}_t>({}, {}u, 0x{:02x}u);'
+        fmt = '\t_buffer[{}] |= pack_{}_shift<uint{}_t>({}_encoded, {}u, 0x{:02x}u);'
         line = fmt.format(index,
                           shift_direction,
                           signal.type_length,

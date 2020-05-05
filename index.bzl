@@ -4,6 +4,41 @@ GENERATE_CPP_DEPS = [
     "@com_google_abseil//absl/types:span",
 ]
 
+# Duplicate camel_to_snake_case function in cantools/database/can/c_source.py with re
+def _camel_to_snake_case(value):
+    # Replace hyphen with underscore
+    value = value.replace('-', '_')
+    # Replace multiple underscores = re.sub(r'(_+)', '_', value)
+    for underscores in ['__', '___', '____', '_____']:
+        value = value.replace(underscores, '_')
+
+    outname = value.elems()[0]
+    prev_is_upper = value.elems()[0].isupper()
+    prev_is_lower = value.elems()[0].islower()
+    prev_is_digit = value.elems()[0].isdigit()
+    is_upper = False
+    is_lower = False
+    is_digit = False
+
+    for letter in value.elems()[1:]:
+        is_upper = letter.isupper()
+        is_lower = letter.islower()
+        is_digit = letter.isdigit()
+
+        # Prefix camelcase with _ = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', value)
+        # Prefix lower to upper or digit to upper with _ = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', value)
+        if (prev_is_upper and is_lower) or (prev_is_lower and is_upper) or (prev_is_digit and is_upper):
+            last_char = outname[-1]
+            outname = outname.rstrip(last_char)
+            outname = outname + '_'  + last_char
+
+        outname += letter
+        prev_is_upper = is_upper
+        prev_is_lower = is_lower
+        prev_is_digit = is_digit
+
+    return outname.lower()
+
 def _generate_c_impl(ctx):
     outdir = ctx.build_file_path.split('/BUILD')[0]
     all_outputs = []
@@ -14,6 +49,7 @@ def _generate_c_impl(ctx):
             args = ctx.actions.args()
     
             basename = dbc.path.split("/")[-1].split(".dbc")[0]
+            basename = _camel_to_snake_case(basename)
             outputs.append(ctx.actions.declare_file("%s.c" % basename))
             outputs.append(ctx.actions.declare_file("%s.h" % basename))
 
@@ -73,6 +109,7 @@ def _generate_cpp_impl(ctx):
             args = ctx.actions.args()
 
             basename = dbc.path.split("/")[-1].split(".dbc")[0]
+            basename = _camel_to_snake_case(basename)
             outputs.append(ctx.actions.declare_file("%s.cc" % basename))
             outputs.append(ctx.actions.declare_file("%s.h" % basename))
 
