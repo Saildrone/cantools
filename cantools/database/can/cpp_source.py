@@ -119,49 +119,11 @@ MESSAGE_DECLARATION_FMT = '''\
  */
 class {database_message_name} : public Frame {{
 public:
-    // Constructor, empty buffer
     {database_message_name}();
-    // Constructor to maintain ownership of input buffer
     {database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size);
-    // Constructor pass in buffer and buffer size, user maintains buffer ownership after object destruction
     {database_message_name}(uint8_t* buffer, const size_t size);
 
-    ~{database_message_name}() = default;
-
-    {database_message_name}& GetMessage() {{ 
-        return *this; 
-    }}
- 
-    // Read-only span to access underlying buffer
-    absl::Span<const uint8_t> buffer() const {{
-        return absl::Span<const uint8_t>(&_buffer[0], _buffer_size);
-    }}
- 
-    size_t size() const {{
-        return _buffer_size;
-    }}
-
-    // Buffer to string
-    std::string to_string() const {{
-        std::ostringstream oss;
-        oss << std::hex << std::setfill('0');
-        for (size_t i = 0; i < _buffer_size; ++i) {{
-            oss << std::setw(2) << (unsigned int)_buffer[i];
-        }}
-        return oss.str();
-    }}
-  
-    // Clear buffer
-    void clear() {{
-        std::fill_n(_buffer, _buffer_size, 0u);
-    }}
-
 {signal_setters}
-
-private:
-    std::unique_ptr<uint8_t[]> _buffer_ptr;
-    uint8_t* _buffer;
-    size_t _buffer_size;
 
 public:
 {signals}
@@ -199,27 +161,18 @@ bool {message_name}_{name}::RawInRange(const {type_name}& value) const {{
 '''
 
 MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
-{database_message_name}::{database_message_name}(uint8_t* buffer, const size_t size)
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
-    , _buffer_ptr{{nullptr}}
-    , _buffer{{buffer}}
-    , _buffer_size(size)
+{database_message_name}::{database_message_name}()
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, {length}u)
 {signals}
 {{}}
 
 {database_message_name}::{database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size)
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
-    , _buffer_ptr{{std::move(other)}}
-    , _buffer{{_buffer_ptr.get()}}
-    , _buffer_size(size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, std::move(other), size)
 {signals}
 {{}}
 
-{database_message_name}::{database_message_name}()
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
-    , _buffer_ptr{{new uint8_t[{length}]()}}
-    , _buffer{{_buffer_ptr.get()}}
-    , _buffer_size({length}u)
+{database_message_name}::{database_message_name}(uint8_t* buffer, const size_t size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, buffer, size)
 {signals}
 {{}}
 '''

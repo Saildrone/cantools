@@ -36,13 +36,63 @@ data_type unpack_right_shift(uint16_t value, uint16_t shift, uint16_t mask)
  */
 class Frame {
 public:
-    Frame(uint32_t id, const std::string& name, const uint32_t size, const bool extended, const uint32_t cycle_time)
+    // Empty buffer constructor
+    Frame(uint32_t id, const std::string& name, const uint32_t size, const bool extended, const uint32_t cycle_time, const size_t buffer_size)
         : _id(id)
         , _name(name)
         , _size(size)
         , _extended(extended)
         , _cycle_time(cycle_time)
+        , _buffer_ptr{new uint8_t[buffer_size]()}
+        , _buffer{_buffer_ptr.get()}
+        , _buffer_size{buffer_size}
     {}
+
+    // Move construct unique_ptr to buffer
+    Frame(uint32_t id, const std::string& name, const uint32_t size, const bool extended, const uint32_t cycle_time,
+          std::unique_ptr<uint8_t[]>&& other, const size_t buffer_size)
+        : _id(id)
+        , _name(name)
+        , _size(size)
+        , _extended(extended)
+        , _cycle_time(cycle_time)
+        , _buffer_ptr{std::move(other)}
+        , _buffer{_buffer_ptr.get()}
+        , _buffer_size{buffer_size}
+    {}
+
+    // Construct with raw pointer buffer, do not maintain ownership after object destruction
+    Frame(uint32_t id, const std::string& name, const uint32_t size, const bool extended, const uint32_t cycle_time,
+          uint8_t* buffer, const size_t buffer_size)
+        : _id(id)
+        , _name(name)
+        , _size(size)
+        , _extended(extended)
+        , _cycle_time(cycle_time)
+        , _buffer_ptr{nullptr}
+        , _buffer{buffer}
+        , _buffer_size{buffer_size}
+    {}
+
+    // Read-only span to access underlying buffer
+    absl::Span<const uint8_t> buffer() const {
+        return absl::Span<const uint8_t>(&_buffer[0], _buffer_size);
+    }
+
+    // Buffer to string
+    std::string to_string() const {
+        std::ostringstream oss;
+        oss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < _buffer_size; ++i) {{
+            oss << std::setw(2) << (unsigned int)_buffer[i];
+        }}
+        return oss.str();
+    }
+
+    // Clear buffer
+    void clear() {
+        std::fill_n(_buffer, _buffer_size, 0u);
+    }
 
     uint32_t id() const { 
         return _id;
@@ -83,6 +133,16 @@ private:
 
     // Message cycle time [ms]
     uint32_t _cycle_time;
+
+protected:
+    // Ownership of buffer
+    std::unique_ptr<uint8_t[]> _buffer_ptr;
+
+    // Buffer containing frame
+    uint8_t* _buffer;
+
+    // Buffer size
+    size_t _buffer_size;
 };
 
 /**
