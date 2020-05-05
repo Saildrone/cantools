@@ -1,5 +1,9 @@
 """Wrap `cantools generate_c_source` and `cantools generate_cpp_source` in a macro"""
 
+GENERATE_CPP_DEPS = [
+    "@com_google_abseil//absl/types:span",
+]
+
 def _generate_c_impl(ctx):
     outdir = ctx.build_file_path.split('/BUILD')[0]
     all_outputs = []
@@ -90,11 +94,11 @@ def _generate_cpp_impl(ctx):
             all_outputs.extend(outputs)
 
     # TODO a better way to copy Frame.h as an output
-    out = ctx.actions.declare_file("Frame.h")
+    out = ctx.actions.declare_file("DBC.h")
     ctx.actions.run_shell(
         outputs=[out],
-        inputs=ctx.attr._frame_header.files,
-        arguments=[ctx.attr._frame_header.files.to_list()[0].path, out.path],
+        inputs=ctx.attr._dbc_header.files,
+        arguments=[ctx.attr._dbc_header.files.to_list()[0].path, out.path],
         command="cp $1 $2" 
     )
     all_outputs.extend([out])
@@ -122,10 +126,10 @@ generate_cpp = rule(
             cfg = "host",
             default = Label("//cantools:cantools"),
         ),
-        "_frame_header": attr.label(
-            doc = "Frame.h header file",
+        "_dbc_header": attr.label(
+            doc = "DBC.h header file",
             allow_single_file = True,
-            default = Label("//cantools/database/can/templates:Frame.h"),
+            default = Label("//cantools/database/can/templates:DBC.h"),
         ),
     }
 )

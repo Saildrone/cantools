@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//:index.bzl", "generate_cpp")
+load("//:index.bzl", "generate_cpp", "GENERATE_CPP_DEPS")
 load("@rules_python//python:defs.bzl", "py_test")
 
 filegroup(
@@ -74,6 +74,7 @@ cc_library(
         ":gen_cpp_dbc",
     ],
     includes = ["."],
+    deps = GENERATE_CPP_DEPS,
 )
 
 cc_test(

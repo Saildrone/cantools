@@ -1,10 +1,10 @@
 from __future__ import print_function
-import re
+from enum import Enum
 import time
 from decimal import Decimal
 
 from ...version import __version__
-
+from .c_source import Message, camel_to_snake_case, _strip_blank_lines, _get, _format_decimal, _format_range
 
 HEADER_FMT = '''\
 /**
@@ -40,7 +40,13 @@ HEADER_FMT = '''\
 #ifndef {include_guard}
 #define {include_guard}
 
-#include "Frame.h"
+#include <string>
+#include <sstream>
+#include <iomanip>
+
+#include "absl/types/span.h"
+
+#include "DBC.h"
 
 {declarations}
 
@@ -83,7 +89,29 @@ SOURCE_FMT = '''\
 {definitions}\
 '''
 
+SIGNAL_DECLARATION_FMT = '''\
+/**
+ * Signal {name}.
+ * Message {message_name}
+ *
+{comment}\
+ * Range: {range}
+ * Scale: {scale}
+ * Offset: {offset}
+{additional_comments}\
+ */
+class {message_name}_{name} : public Signal<{type_name}, double> {{
+public:
+    {message_name}_{name}(const uint8_t* buffer);
+
+    virtual {type_name} raw() override;
+    virtual bool raw_in_range(const {type_name}& value) const override;
+}};
+'''
+
 MESSAGE_DECLARATION_FMT = '''\
+{signal_constructors}
+
 /**
  * Message {database_message_name}.
  *
@@ -91,130 +119,117 @@ MESSAGE_DECLARATION_FMT = '''\
  */
 class {database_message_name} : public Frame {{
 public:
-    /** Constructor */
-    {database_message_name}(uint8_t* buffer, size_t size);
+    // Constructor, empty buffer
+    {database_message_name}();
+    // Constructor to maintain ownership of input buffer
+    {database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size);
+    // Constructor pass in buffer and buffer size, user maintains buffer ownership after object destruction
+    {database_message_name}(uint8_t* buffer, const size_t size);
+
+    ~{database_message_name}() = default;
 
     {database_message_name}& GetMessage() {{ 
         return *this; 
     }}
  
-    uint8_t* buffer() {{
-        return _buffer;
+    // Read-only span to access underlying buffer
+    absl::Span<const uint8_t> buffer() const {{
+        return absl::Span<const uint8_t>(&_buffer[0], _buffer_size);
     }}
  
-    size_t buffer_size() {{
+    size_t size() const {{
         return _buffer_size;
+    }}
+
+    // Buffer to string
+    std::string to_string() const {{
+        std::ostringstream oss;
+        oss << std::hex << std::setfill('0');
+        for (size_t i = 0; i < _buffer_size; ++i) {{
+            oss << std::setw(2) << (unsigned int)_buffer[i];
+        }}
+        return oss.str();
     }}
   
     // Clear buffer
+    // This function invalidates references to the underlying buffer, external ownership invalidated
     void clear() {{
-        memset(_buffer, 0, _buffer_size);
+        _buffer_ptr.reset(new uint8_t[_buffer_size]);
+        _buffer = _buffer_ptr.get();
     }}
 
-{members}
+{signal_setters}
 
 private:
+    std::unique_ptr<uint8_t[]> _buffer_ptr;
     uint8_t* _buffer;
     size_t _buffer_size;
 
-{encode_decode_members}
+public:
+{signals}
 }};
 '''
 
-SIGNAL_DECLARATION_FMT = '''\
-    /**
-     * Signal {name}.
-{comment}\
-     * Range: {range}
-     * Scale: {scale}
-     * Offset: {offset}
-{additional_comments}\
-     */
-    double {name}();
-    {type_name} {name}_raw();
-    bool set_{name}(const double& value);
-    bool {name}_in_range(const double& value);
-    bool {name}_raw_in_range(const {type_name}& value) const;
-    std::string {name}_data_format() const;
-    {additional}\
-'''
-
-SIGNAL_ENCODE_DECODE_DECLARATION_FMT = '''\
-    {type_name} {name}_encode(double value);
-    double {name}_decode({type_name} value);
+MESSAGE_SIGNAL_SETTER_DECLARATION_FMT = '''\
+bool set_{name}(const double& value);
 '''
 
 MESSAGE_DEFINITION_FMT = '''\
-{constructor}
 {signal_definitions}
-'''
-
-MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
-{database_message_name}::{database_message_name}(uint8_t* buffer, size_t size)
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
-    , _buffer(buffer)
-    , _buffer_size(size)
-{{}}
+{constructor}
+{signal_setters}
 '''
 
 SIGNAL_DEFINITION_FMT = '''\
-double {database_message_name}::{name}() {{
-{contents}
-}}
+{message_name}_{name}::{message_name}_{name}(const uint8_t* buffer)
+    : Signal({constructor_params})
+{{}}
 
 '''
 
 SIGNAL_DEFINITION_RAW_FMT = '''\
-{type_name} {database_message_name}::{name}_raw() {{
+{type_name} {message_name}_{name}::raw() {{
 {contents}
 }}
 
+'''
+
+SIGNAL_DEFINITION_RAW_IN_RANGE_FMT = '''\
+bool {message_name}_{name}::raw_in_range(const {type_name}& value) const {{
+    return ({check});
+}}
+'''
+
+MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
+{database_message_name}::{database_message_name}(uint8_t* buffer, const size_t size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
+    , _buffer_ptr{{nullptr}}
+    , _buffer{{buffer}}
+    , _buffer_size(size)
+{signals}
+{{}}
+
+{database_message_name}::{database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
+    , _buffer_ptr{{std::move(other)}}
+    , _buffer{{_buffer_ptr.get()}}
+    , _buffer_size(size)
+{signals}
+{{}}
+
+{database_message_name}::{database_message_name}()
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
+    , _buffer_ptr{{new uint8_t[{length}]()}}
+    , _buffer{{_buffer_ptr.get()}}
+    , _buffer_size({length}u)
+{signals}
+{{}}
 '''
 
 SIGNAL_DEFINITION_SET_FMT = '''\
 bool {database_message_name}::set_{name}(const double& value) {{
 
 {contents}
-}}
-
-'''
-
-SIGNAL_DEFINITION_IN_RANGE_FMT = '''\
-bool {database_message_name}::{name}_in_range(const double& value) {{
-    {type_name} {snake_name} = {name}_encode(value);
-    return {name}_raw_in_range({snake_name});
-}}
-
-'''
-
-SIGNAL_DEFINITION_RAW_IN_RANGE_FMT = '''\
-bool {database_message_name}::{name}_raw_in_range(const {type_name}& value) const {{
-    return ({check});
-}}
-
-'''
-
-SIGNAL_DEFINITION_DATA_FORMAT_FMT = '''\
-std::string {database_message_name}::{name}_data_format() const {{
-    return "{data_format}";
-}}
-
-'''
-
-SIGNAL_DEFINITION_SPN_FMT = '''\
-uint32_t {database_message_name}::{name}_SPN() const {{
-    return {spn};
-}}
-
-'''
-
-SIGNAL_DEFINITION_ENCODE_DECODE_FMT = '''\
-{type_name} {database_message_name}::{name}_encode(double value) {{
-    return static_cast<{type_name}>({encode});
-}}
-
-double {database_message_name}::{name}_decode({type_name} value) {{
-    return ({decode});
 }}
 '''
 
@@ -225,337 +240,35 @@ SIGN_EXTENSION_FMT = '''
 
 '''
 
-
-class Signal(object):
-
-    def __init__(self, signal):
-        self._signal = signal
-        self.snake_name = camel_to_snake_case(self.name)
-
-    def __getattr__(self, name):
-        return getattr(self._signal, name)
-
-    @property
-    def unit(self):
-        return _get(self._signal.unit, '-')
-
-    @property
-    def type_length(self):
-        if self.length <= 8:
-            return 8
-        elif self.length <= 16:
-            return 16
-        elif self.length <= 32:
-            return 32
-        else:
-            return 64
-
-    @property
-    def type_name(self):
-        if self.is_float:
-            if self.length == 32:
-                type_name = 'float'
-            else:
-                type_name = 'double'
-        else:
-            type_name = 'int{}_t'.format(self.type_length)
-
-            if not self.is_signed:
-                type_name = 'u' + type_name
-
-        return type_name
-
-    @property
-    def type_suffix(self):
-        try:
-            return {
-                'uint8_t': 'u',
-                'uint16_t': 'u',
-                'uint32_t': 'u',
-                'int64_t': 'll',
-                'uint64_t': 'ull',
-                'float': 'f'
-            }[self.type_name]
-        except KeyError:
-            return ''
-
-    @property
-    def conversion_type_suffix(self):
-        try:
-            return {
-                8: 'u',
-                16: 'u',
-                32: 'u',
-                64: 'ull'
-            }[self.type_length]
-        except KeyError:
-            return ''
-
-    @property
-    def unique_choices(self):
-        """Make duplicated choice names unique by first appending its value
-        and then underscores until unique.
-
-        """
-
-        items = {
-            value: camel_to_snake_case(name).upper()
-            for value, name in self.choices.items()
-        }
-        names = list(items.values())
-        duplicated_names = [
-            name
-            for name in set(names)
-            if names.count(name) > 1
-        ]
-        unique_choices = {
-            value: name
-            for value, name in items.items()
-            if names.count(name) == 1
-        }
-
-        for value, name in items.items():
-            if name in duplicated_names:
-                name += _canonical('_{}'.format(value))
-
-                while name in unique_choices.values():
-                    name += '_'
-
-                unique_choices[value] = name
-
-        return unique_choices
-
-    @property
-    def minimum_type_value(self):
-        if self.type_name == 'int8_t':
-            return -128
-        elif self.type_name == 'int16_t':
-            return -32768
-        elif self.type_name == 'int32_t':
-            return -2147483648
-        elif self.type_name == 'int64_t':
-            return -9223372036854775808
-        elif self.type_name[0] == 'u':
-            return 0
-        else:
-            return None
-
-    @property
-    def maximum_type_value(self):
-        if self.type_name == 'int8_t':
-            return 127
-        elif self.type_name == 'int16_t':
-            return 32767
-        elif self.type_name == 'int32_t':
-            return 2147483647
-        elif self.type_name == 'int64_t':
-            return 9223372036854775807
-        elif self.type_name == 'uint8_t':
-            return 255
-        elif self.type_name == 'uint16_t':
-            return 65535
-        elif self.type_name == 'uint32_t':
-            return 4294967295
-        elif self.type_name == 'uint64_t':
-            return 18446744073709551615
-        else:
-            return None
-
-    @property
-    def minimum_value(self):
-        if self.is_float:
-            return None
-        elif self.is_signed:
-            return -(2 ** (self.length - 1))
-        else:
-            return 0
-
-    @property
-    def maximum_value(self):
-        if self.is_float:
-            return None
-        elif self.is_signed:
-            return ((2 ** (self.length - 1)) - 1)
-        else:
-            return ((2 ** self.length) - 1)
-
-    def segments(self, invert_shift):
-        index, pos = divmod(self.start, 8)
-        left = self.length
-
-        while left > 0:
-            if self.byte_order == 'big_endian':
-                if left >= (pos + 1):
-                    length = (pos + 1)
-                    pos = 7
-                    shift = -(left - length)
-                    mask = ((1 << length) - 1)
-                else:
-                    length = left
-                    shift = (pos - length + 1)
-                    mask = ((1 << length) - 1)
-                    mask <<= (pos - length + 1)
-            else:
-                shift = (left - self.length) + pos
-
-                if left >= (8 - pos):
-                    length = (8 - pos)
-                    mask = ((1 << length) - 1)
-                    mask <<= pos
-                    pos = 0
-                else:
-                    length = left
-                    mask = ((1 << length) - 1)
-                    mask <<= pos
-
-            if invert_shift:
-                if shift < 0:
-                    shift = -shift
-                    shift_direction = 'left'
-                else:
-                    shift_direction = 'right'
-            else:
-                if shift < 0:
-                    shift = -shift
-                    shift_direction = 'right'
-                else:
-                    shift_direction = 'left'
-
-            yield index, shift, shift_direction, mask
-
-            left -= length
-            index += 1
-
-
-class Message(object):
-
-    def __init__(self, message):
-        self._message = message
-        self.snake_name = camel_to_snake_case(self.name)
-        self.signals = [Signal(signal)for signal in message.signals]
-
-    def __getattr__(self, name):
-        return getattr(self._message, name)
-
-    def get_signal_by_name(self, name):
-        for signal in self.signals:
-            if signal.name == name:
-                return signal
-
-
-def _canonical(value):
-    """Replace anything but 'a-z', 'A-Z' and '0-9' with '_'.
-
-    """
-
-    return re.sub(r'[^a-zA-Z0-9]', '_', value)
-
-
-def camel_to_snake_case(value):
-    value = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', value)
-    value = re.sub(r'(_+)', '_', value)
-    value = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', value).lower()
-    value = _canonical(value)
-
-    return value
-
-
-def _strip_blank_lines(lines):
-    try:
-        while lines[0] == '':
-            lines = lines[1:]
-
-        while lines[-1] == '':
-            lines = lines[:-1]
-    except IndexError:
-        pass
-
-    return lines
-
-
-def _get(value, default):
-    if value is None:
-        value = default
-
-    return value
-
-
-def _format_comment(comment):
+def _format_comment_no_tabs(comment):
     if comment:
         return '\n'.join([
-            '     * ' + line.rstrip()
+            ' * ' + line.rstrip()
             for line in comment.splitlines()
-        ]) + '\n     *\n'
+        ]) + '\n *\n'
     else:
         return ''
 
 
-def _format_decimal(value, is_float=False):
-    if int(value) == value:
-        value = int(value)
-
-        if is_float:
-            return str(value) + '.0'
-        else:
-            return str(value)
-    else:
-        return str(value)
-
-
-def _format_range(signal):
-    minimum = signal.decimal.minimum
-    maximum = signal.decimal.maximum
-    scale = signal.decimal.scale
-    offset = signal.decimal.offset
-
-    if minimum is not None and maximum is not None:
-        return '{}..{} ({}..{} {})'.format(
-            _format_decimal((minimum - offset) / scale),
-            _format_decimal((maximum - offset) / scale),
-            minimum,
-            maximum,
-            signal.unit)
-    elif minimum is not None:
-        return '{}.. ({}.. {})'.format(
-            _format_decimal((minimum - offset) / scale),
-            minimum,
-            signal.unit)
-    elif maximum is not None:
-        return '..{} (..{} {})'.format(
-            _format_decimal((maximum - offset) / scale),
-            maximum,
-            signal.unit)
-    else:
-        return '-'
-
-
-def _generate_signal_declaration(signal):
-    comment = _format_comment(signal.comment)
+def _generate_signal_declaration(signal, message_name):
+    comment = _format_comment_no_tabs(signal.comment)
     range_ = _format_range(signal)
     scale = _get(signal.scale, '-')
     offset = _get(signal.offset, '-')
     additional_comments = ''
-    additional = ''
 
     if 'SPN' in signal.dbc.attributes:
-        additional = 'uint32_t {name}_SPN() const;'.format(name=signal.name)
         additional_comments += 'SPN: {spn}'.format(spn=signal.dbc.attributes['SPN'].value)
 
-    member = SIGNAL_DECLARATION_FMT.format(comment=comment,
+    member = SIGNAL_DECLARATION_FMT.format(name=signal.name,
+                                           message_name=message_name,
+                                           comment=comment,
                                            range=range_,
                                            scale=scale,
                                            offset=offset,
-                                           additional_comments=_format_comment(additional_comments),
-                                           name=signal.name,
-                                           type_name=signal.type_name,
-                                           additional=additional)
+                                           additional_comments=_format_comment_no_tabs(additional_comments),
+                                           type_name=signal.type_name)
     return member
-
-
-def _generate_signal_encode_decode_declaration(signal):
-    return SIGNAL_ENCODE_DECODE_DECLARATION_FMT.format(
-        type_name=signal.type_name,
-        name=signal.name)
 
 
 # TODO unused - re-implement if supporting signal multiplexing is desired
@@ -603,13 +316,13 @@ def _format_pack_code_mux(message,
 def _format_pack_code_signal(message,
                              signal_name):
     signal = message.get_signal_by_name(signal_name)
-    fmt = '\tuint{}_t {} = {}_encode(value);\n'
+    fmt = '\tuint{}_t {} = {}.encode(value);\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
                               signal.name)
 
     body_lines = []
-    body_lines.append(f'\tif (!{signal.name}_raw_in_range({signal.snake_name})) {{\n\t\treturn false;\n\t}}')
+    body_lines.append(f'\tif (!{signal.name}.raw_in_range({signal.snake_name})) {{\n\t\treturn false;\n\t}}')
 
     for index, shift, shift_direction, mask in signal.segments(invert_shift=False):
         fmt = '\t_buffer[{}] |= pack_{}_shift<uint{}_t>({}, {}u, 0x{:02x}u);'
@@ -749,27 +462,21 @@ def _format_unpack_code(message):
 
 
 def _generate_message_declaration(message):
-    members = []
-    encode_decode_members = []
+    signal_constructors = []
+    signal_setters = []
+    signals = []
 
     for signal in message.signals:
-        members.append(_generate_signal_declaration(signal))
-        encode_decode_members.append(_generate_signal_encode_decode_declaration(signal))
-
-    if not members:
-        members = [
-            '    /**\n'
-            '     * Dummy signal in empty message.\n'
-            '     */\n'
-            '    uint8_t dummy;'
-        ]
+        signal_constructors.append(_generate_signal_declaration(signal, message.name))
+        signal_setters.append(f'\tbool set_{signal.name}(const double& value);')
+        signals.append(f'\t{message.name}_{signal.name} {signal.name};')
 
     if message.comment is None:
         comment = ''
     else:
         comment = ' * {}\n *\n'.format(message.comment)
 
-    return comment, members, encode_decode_members
+    return signal_constructors, comment, signal_setters, signals
 
 
 # TODO signal choices not implemented, should support??
@@ -789,33 +496,20 @@ def _format_choices(signal, signal_name):
     return choices
 
 
-def _generate_encode_decode(message):
-    encode_decode = []
+def _generate_constructor_params(signal):
+    param = f'buffer, "{signal.name}"'
 
-    for signal in message.signals:
-        scale = signal.decimal.scale
-        offset = signal.decimal.offset
-        formatted_scale = _format_decimal(scale, is_float=True)
-        formatted_offset = _format_decimal(offset, is_float=True)
+    scale = signal.decimal.scale
+    offset = signal.decimal.offset
+    formatted_scale = _format_decimal(scale, is_float=True)
+    formatted_offset = _format_decimal(offset, is_float=True)
 
-        if offset == 0 and scale == 1:
-            encoding = 'value'
-            decoding = '(double)value'
-        elif offset != 0 and scale != 1:
-            encoding = '(value - {}) / {}'.format(formatted_offset,
-                                                  formatted_scale)
-            decoding = '(static_cast<double>(value) * {}) + {}'.format(formatted_scale,
-                                                          formatted_offset)
-        elif offset != 0:
-            encoding = 'value - {}'.format(formatted_offset)
-            decoding = 'static_cast<double>(value) + {}'.format(formatted_offset)
-        else:
-            encoding = 'value / {}'.format(formatted_scale)
-            decoding = 'static_cast<double>(value) * {}'.format(formatted_scale)
+    spn = signal.dbc.attributes['SPN'].value if 'SPN' in signal.dbc.attributes else '0'
+    unit = '""' if signal.unit == '-' else f'"{signal.unit}"'
 
-        encode_decode.append((encoding, decoding))
-
-    return encode_decode
+    if not (offset == 0 and scale == 1 and unit == '""' and spn == '0'):
+        param += f', {offset}, {scale}, {unit}, {spn}'
+    return param
 
 
 def _generate_is_in_range(message):
@@ -905,15 +599,15 @@ def _generate_declarations(database_name, messages):
     classes = []
 
     for message in messages:
-        comment, members, encode_decode_members = _generate_message_declaration(message)
+        signal_constructors, comment, signal_setters, signals = _generate_message_declaration(message)
         classes.append(
             MESSAGE_DECLARATION_FMT.format(
+                signal_constructors='\n'.join(signal_constructors),
                 comment=comment,
                 database_message_name=message.name,
                 message_name=message.snake_name,
-                database_name=database_name,
-                members='\n\n'.join(members),
-                encode_decode_members='\n'.join(encode_decode_members)))
+                signal_setters='\n'.join(signal_setters),
+                signals='\n'.join(signals)))
         
     return '\n'.join(classes)
 
@@ -923,7 +617,43 @@ def _generate_definitions(database_name, messages):
 
     for message in messages:
         definition = ''
+        signals_in_msg_constructor = []
         signal_definitions = []
+        signal_setters = []
+
+        range_checks = _generate_is_in_range(message)
+        pack = _format_pack_code(message)
+        unpack = _format_unpack_code(message)
+
+        for signal_iter, signal in enumerate(message.signals):
+            signal_definition = f'// Signal {message.name}.{signal.name}\n'
+
+            signals_in_msg_constructor.append(f'\t, {signal.name}(_buffer)')
+
+            signal_definition += SIGNAL_DEFINITION_FMT.format(
+                name=signal.name,
+                message_name=message.name,
+                constructor_params=_generate_constructor_params(signal))
+
+            signal_definition += SIGNAL_DEFINITION_RAW_FMT.format(
+                name=signal.name,
+                message_name=message.name,
+                type_name=signal.type_name,
+                contents = unpack[signal.name])
+
+            signal_definition += SIGNAL_DEFINITION_RAW_IN_RANGE_FMT.format(
+                database_message_name=message.name,
+                name=signal.name,
+                message_name=message.name,
+                type_name=signal.type_name,
+                check=range_checks[signal_iter])
+
+            signal_definitions.append(signal_definition)
+
+            signal_setters.append(SIGNAL_DEFINITION_SET_FMT.format(
+                database_message_name=message.name,
+                name=signal.name,
+                contents = pack[signal.name]))
 
         constructor = f'// Message {message.name}\n'
         constructor += MESSAGE_CONSTRUCTOR_DEFINITION_FMT.format(
@@ -931,68 +661,13 @@ def _generate_definitions(database_name, messages):
             id='0x{:02x}'.format(message.frame_id),
             length=message.length,
             extended=str(message.is_extended_frame).lower(),
-            cycle_time=message.cycle_time if message.cycle_time else '0') 
-
-        range_checks = _generate_is_in_range(message)
-        encode_decode = _generate_encode_decode(message)
-
-        pack = _format_pack_code(message)
-        unpack = _format_unpack_code(message)
-
-        for signal_iter, signal in enumerate(message.signals):
-            signal_definition = f'// {message.name}.{signal.name}\n'
-
-            signal_definition += SIGNAL_DEFINITION_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                contents=f'\treturn {signal.name}_decode({signal.name}_raw());')
-
-            signal_definition += SIGNAL_DEFINITION_RAW_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                type_name=signal.type_name,
-                contents = unpack[signal.name])
-
-            signal_definition += SIGNAL_DEFINITION_SET_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                contents = pack[signal.name])
-
-            signal_definition += SIGNAL_DEFINITION_IN_RANGE_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                type_name=signal.type_name,
-                snake_name=signal.snake_name)
-
-            signal_definition += SIGNAL_DEFINITION_RAW_IN_RANGE_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                type_name=signal.type_name,
-                check=range_checks[signal_iter])
-
-            signal_definition += SIGNAL_DEFINITION_DATA_FORMAT_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                data_format='' if signal.unit == '-' else signal.unit)
-
-            if 'SPN' in signal.dbc.attributes:
-                signal_definition += SIGNAL_DEFINITION_SPN_FMT.format(
-                    database_message_name=message.name,
-                    name=signal.name,
-                    spn=signal.dbc.attributes['SPN'].value)
-            
-            signal_definition += SIGNAL_DEFINITION_ENCODE_DECODE_FMT.format(
-                database_message_name=message.name,
-                name=signal.name,
-                type_name=signal.type_name,
-                encode=encode_decode[signal_iter][0],
-                decode=encode_decode[signal_iter][1])
-
-            signal_definitions.append(signal_definition)
+            cycle_time=message.cycle_time if message.cycle_time else '0',
+            signals='\n'.join(signals_in_msg_constructor))
 
         definition = MESSAGE_DEFINITION_FMT.format(
+            signal_definitions='\n'.join(signal_definitions),
             constructor=constructor,
-            signal_definitions='\n'.join(signal_definitions))
+            signal_setters='\n'.join(signal_setters))
         
         definitions.append(definition)
 

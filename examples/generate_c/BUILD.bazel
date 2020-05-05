@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-load("//:index.bzl", "generate_c", "generate_cpp")
+load("//:index.bzl", "generate_c", "generate_cpp", "GENERATE_CPP_DEPS")
 
 filegroup(
     name = "signed_dbc",
@@ -33,7 +33,7 @@ generate_cpp(
 
 # Verify cc_library can build with outputs of generate_c macro
 cc_library(
-    name = "vehicle_lib_c",
+    name = "signed_lib_c",
     srcs = [":test_generate_c_single"],
 )
 
@@ -41,6 +41,7 @@ cc_library(
 cc_library(
     name = "vehicle_lib_cpp",
     srcs = [":test_generate_cpp_single"],
+    deps = GENERATE_CPP_DEPS,
 )
 
 # Assortment of DBC files
@@ -55,7 +56,7 @@ filegroup(
 
 
 # bazel build //examples/generate_c:test_generate_cpp
-generate_c(
+generate_cpp(
     name = "test_generate_cpp",
     dbcs = [
         ":dbcs_misc",
