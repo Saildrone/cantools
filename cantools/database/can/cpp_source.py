@@ -40,12 +40,6 @@ HEADER_FMT = '''\
 #ifndef {include_guard}
 #define {include_guard}
 
-#include <string>
-#include <sstream>
-#include <iomanip>
-
-#include "absl/types/span.h"
-
 #include "DBC.h"
 
 {declarations}

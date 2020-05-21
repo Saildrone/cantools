@@ -1,8 +1,13 @@
 #ifndef CANTOOLS_DBC_H
 #define CANTOOLS_DBC_H
 
-#include <stdint.h>
+#include <cstdint>
+#include <iomanip>
+#include <memory>
 #include <string>
+#include <sstream>
+
+#include "absl/types/span.h"
 
 /**
  * Templated functions use to decode and encode Signals
@@ -34,6 +39,10 @@ data_type unpack_right_shift(uint16_t value, uint16_t shift, uint16_t mask)
 /**
  * Abstract base class used to define CAN Messages
  */
+
+static const uint32_t J1939_PGN_OFFSET = 8;
+static const uint32_t J1939_PGN_MASK = 0x3FFFF;
+
 class Frame {
 public:
     // Empty buffer constructor
@@ -96,6 +105,14 @@ public:
 
     uint32_t id() const { 
         return _id;
+    }
+
+    uint32_t PGN() const {
+        if (_extended) {
+            return (_id >> J1939_PGN_OFFSET) & J1939_PGN_MASK;
+        } else {
+            return 0;
+        }
     }
 
     std::string name() const {
