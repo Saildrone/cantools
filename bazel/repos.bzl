@@ -20,7 +20,7 @@ def googletest_repos(**kwargs):
 
 def abseil_repos(**kwargs):
     http_archive(
-        name = "com_google_abseil",
+        name = "com_google_absl",
         urls = [
             "https://github.com/abseil/abseil-cpp/archive/20200225.2.tar.gz",
         ],

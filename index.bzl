@@ -1,7 +1,7 @@
 """Wrap `cantools generate_c_source` and `cantools generate_cpp_source` in a macro"""
 
 GENERATE_CPP_DEPS = [
-    "@com_google_abseil//absl/types:span",
+    "@com_google_absl//absl/types:span",
 ]
 
 # Duplicate camel_to_snake_case function in cantools/database/can/c_source.py with re
