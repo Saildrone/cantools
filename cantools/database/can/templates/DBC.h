@@ -100,7 +100,7 @@ public:
     }
 
     /** Getter message ID. */
-    uint32_t id() const { 
+    uint32_t ID() const {
         return id_;
     }
 
