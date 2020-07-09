@@ -75,7 +75,7 @@ TEST(css__electronics_sae_j1939_demo, spns) {
     EXPECT_EQ(ccvs1.WheelBasedVehicleSpeed.SPN(), 84);
     
     // Test static member vars
-    EXPECT_EQ(EEC1::cycle_time, 500);
+    EXPECT_EQ(EEC1::cycle_time_ms, 500);
     EXPECT_EQ(CCVS1::ID, 0x18fef1fe);
     EXPECT_EQ(CCVS1::PGN, 0xfef1);
 }

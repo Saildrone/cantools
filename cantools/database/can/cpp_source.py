@@ -423,7 +423,7 @@ def _generate_message_declaration(message):
         comment = ' * {}\n *\n'.format(message.comment)
 
     static_vars = f'\n    // Public static accessor for cycle time and PGN\n' \
-                  f'    static const uint32_t cycle_time;\n' \
+                  f'    static const uint32_t cycle_time_ms;\n' \
                   f'    static const uint32_t ID;\n'
     if message.protocol == 'j1939':
         static_vars += f'    static const uint32_t PGN;\n'
@@ -625,7 +625,7 @@ def _generate_definitions(database_name, messages):
             cycle_time=cycle_time,
             signals='\n'.join(signals_in_msg_constructor))
 
-        static_vars = f'const uint32_t {message.name}::cycle_time = {cycle_time};\n'
+        static_vars = f'const uint32_t {message.name}::cycle_time_ms = {cycle_time};\n'
         static_vars += f'const uint32_t {message.name}::ID = {frame_id}u;\n'
         if message.protocol == 'j1939':
             static_vars += f'const uint32_t {message.name}::PGN = {_compute_pgn(message.frame_id)};\n'
