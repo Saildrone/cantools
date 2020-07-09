@@ -422,7 +422,7 @@ def _generate_message_declaration(message):
     else:
         comment = ' * {}\n *\n'.format(message.comment)
 
-    static_vars = f'\n    // Public static accessor for cycle time and PGN\n' \
+    static_vars = f'\n    // Public static accessor for const message attributes (cycle time, ID, etc.)\n' \
                   f'    static const uint32_t cycle_time_ms;\n' \
                   f'    static const uint32_t ID;\n'
     if message.protocol == 'j1939':
