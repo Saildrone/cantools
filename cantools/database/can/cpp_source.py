@@ -42,6 +42,8 @@ HEADER_FMT = '''\
 
 #include "DBC.h"
 
+{choices}
+
 {declarations}
 
 #endif  // {include_guard}
@@ -431,7 +433,6 @@ def _generate_message_declaration(message):
     return signal_constructors, comment, signal_setters, signals, static_vars
 
 
-# TODO signal choices not implemented, should support??
 def _format_choices(signal, signal_name):
     choices = []
 
@@ -526,7 +527,6 @@ def _generate_is_in_range(message):
     return checks
 
 
-# TODO signal choices not implemented, should support??
 def _generate_choices_defines(database_name, messages):
     choices_defines = []
 
@@ -667,10 +667,12 @@ def generate(database,
     declarations = _generate_declarations(database_name, messages)
 
     definitions = _generate_definitions(database_name, messages)
+    choices = _generate_choices_defines(database_name, messages)
 
     header = HEADER_FMT.format(version=__version__,
                                date=date,
                                include_guard=include_guard,
+                               choices=choices,
                                declarations=declarations)
 
     source = SOURCE_FMT.format(version=__version__,
