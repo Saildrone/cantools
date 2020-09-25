@@ -2,6 +2,8 @@ from __future__ import print_function
 from enum import Enum
 import time
 from decimal import Decimal
+import re
+from typing import AnyStr
 
 from ...version import __version__
 from .c_source import Message, camel_to_snake_case, _strip_blank_lines, _get, _format_decimal, _format_range
@@ -96,6 +98,7 @@ SIGNAL_DECLARATION_FMT = '''\
  */
 class {message_name}_{name} : public Signal<{type_name}, double> {{
 public:
+    {choices}
     {message_name}_{name}(const uint8_t* buffer);
 
     virtual {type_name} Raw() const override;
@@ -206,7 +209,9 @@ def _generate_signal_declaration(signal, message_name):
     if 'SPN' in signal.dbc.attributes:
         additional_comments += 'SPN: {spn}'.format(spn=signal.dbc.attributes['SPN'].value)
 
+    choices = _generate_choices(signal)
     member = SIGNAL_DECLARATION_FMT.format(name=signal.name,
+                                           choices=choices,
                                            message_name=message_name,
                                            comment=comment,
                                            range=range_,
@@ -431,23 +436,6 @@ def _generate_message_declaration(message):
     return signal_constructors, comment, signal_setters, signals, static_vars
 
 
-# TODO signal choices not implemented, should support??
-def _format_choices(signal, signal_name):
-    choices = []
-
-    for value, name in sorted(signal.unique_choices.items()):
-        if signal.is_signed:
-            fmt = '{signal_name}_{name}_CHOICE ({value})'
-        else:
-            fmt = '{signal_name}_{name}_CHOICE ({value}u)'
-
-        choices.append(fmt.format(signal_name=signal_name.upper(),
-                                  name=name,
-                                  value=value))
-
-    return choices
-
-
 def _generate_constructor_params(signal):
     param = f'buffer, "{signal.name}"'
 
@@ -526,25 +514,25 @@ def _generate_is_in_range(message):
     return checks
 
 
-# TODO signal choices not implemented, should support??
-def _generate_choices_defines(database_name, messages):
-    choices_defines = []
+def _format_enum_name(value: AnyStr) -> AnyStr:
+    """
+    Convert an arbitrary string to camelCase with a 'k' prefix
+    i.e. "I'm_a C0nst" -> "kImAC0nst"
+    """
+    caps_alphanumeric = [token.capitalize() for token in re.split(r'[^a-zA-Z0-9]', value)]
+    return f'k{"".join(caps_alphanumeric)}'
 
-    for message in messages:
-        for signal in message.signals:
-            if signal.choices is None:
-                continue
 
-            choices = _format_choices(signal, signal.snake_name)
-            signal_choices_defines = '\n'.join([
-                '#define {}_{}_{}'.format(database_name.upper(),
-                                          message.snake_name.upper(),
-                                          choice)
-                for choice in choices
-            ])
-            choices_defines.append(signal_choices_defines)
+def _generate_choices(signal):
+    if not signal.choices:
+        return ''
 
-    return '\n\n'.join(choices_defines)
+    choices = ["// Static enum values"]
+    for value, name in sorted(signal.unique_choices.items()):
+        var_type = 'int' if signal.is_signed else 'uint'
+        choices.append(f'static constexpr {var_type} {_format_enum_name(name)} = {value};')
+
+    return '\n    '.join(choices) + '\n'
 
 
 def _generate_declarations(database_name, messages):
