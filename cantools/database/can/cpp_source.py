@@ -532,7 +532,7 @@ def _generate_choices(signal):
         var_type = 'int' if signal.is_signed else 'uint'
         choices.append(f'static constexpr {var_type} {_format_enum_name(name)} = {value};')
 
-    return '\n\t'.join(choices) + '\n'
+    return '\n    '.join(choices) + '\n'
 
 
 def _generate_declarations(database_name, messages):
