@@ -8,6 +8,8 @@ from typing import AnyStr
 from ...version import __version__
 from .c_source import Message, camel_to_snake_case, _strip_blank_lines, _get, _format_decimal, _format_range
 
+CPP_TAB = '    '
+
 HEADER_FMT = '''\
 /**
  * The MIT License (MIT)
@@ -41,6 +43,8 @@ HEADER_FMT = '''\
 
 #ifndef {include_guard}
 #define {include_guard}
+
+#include <ostream>
 
 #include "DBC.h"
 
@@ -103,6 +107,8 @@ public:
 
     virtual {type_name} Raw() const override;
     virtual bool RawInRange(const {type_name}& value) const override;
+
+    friend std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal);
 }};
 '''
 
@@ -120,6 +126,8 @@ public:
     {database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size);
     {database_message_name}(uint8_t* buffer, const size_t size);
 
+    friend std::ostream& operator<<(std::ostream& os, const {database_message_name}& frame);
+
 {signal_setters}
 
 {signals}
@@ -134,6 +142,7 @@ bool set_{name}(const double& value);
 MESSAGE_DEFINITION_FMT = '''\
 {signal_definitions}
 {constructor}
+{ostream}
 {static_vars}
 {signal_setters}
 '''
@@ -173,6 +182,21 @@ MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
     : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, buffer, size)
 {signals}
 {{}}
+'''
+
+
+MESSAGE_DEFINITION_OSTREAM_FMT = '''\
+std::ostream& operator<<(std::ostream& os, const {database_message_name}& frame) {{
+{body}
+    return os;
+}}
+'''
+
+SIGNAL_DEFINITION_OSTREAM_FMT = '''\
+std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal) {{
+{body}
+    return os;
+}}
 '''
 
 SIGNAL_DEFINITION_SET_FMT = '''\
@@ -559,6 +583,39 @@ def _compute_pgn(id: int):
     pgn = (id >> PGN_OFFSET) & PGN_MASK
     return f'{hex(pgn)}'
 
+def _signal_ostream_body(message_name, signal):
+
+    if signal.choices and signal.unit.lower() == 'enum':
+        ostream_body = ''
+        for value, name in sorted(signal.unique_choices.items()):
+            # First unique choice
+            if name == list(signal.unique_choices.values())[0]:
+                ostream_body += f'{CPP_TAB}if (signal.Real() == {message_name}_{signal.name}::{_format_enum_name(name)}) {{'
+                ostream_body += f'\n{CPP_TAB}{CPP_TAB}os << "' + _format_enum_name(name).split('k', 1)[1] + '";'
+            # All other choices
+            else:
+                ostream_body += f'\n{CPP_TAB}}} else if (signal.Real() == {message_name}_{signal.name}::{_format_enum_name(name)}) {{'
+                ostream_body += f'\n{CPP_TAB}{CPP_TAB}os << "' + _format_enum_name(name).split('k', 1)[1] + '";'
+        ostream_body += f'\n{CPP_TAB}}} else {{\n{CPP_TAB}{CPP_TAB}os << "UNDEFINED";'
+    else:
+        ostream_body = f'    os << signal.Real()'
+        if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
+           signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
+            ostream_body += f' << " " << signal.data_format()'
+        ostream_body += ';'
+    return ostream_body
+
+def _message_ostream(message):
+    ostream_body = f'    os << '
+    for signal in message.signals:
+        ostream_body += f'"{signal.name}: " << frame.{signal.name}'
+        if signal != message.signals[-1]:
+            ostream_body += ' << "  " << '
+    ostream_body += ';'
+
+    return MESSAGE_DEFINITION_OSTREAM_FMT.format(
+        database_message_name=message.name,
+        body=ostream_body)
 
 def _generate_definitions(database_name, messages):
     definitions = []
@@ -582,6 +639,11 @@ def _generate_definitions(database_name, messages):
                 name=signal.name,
                 message_name=message.name,
                 constructor_params=_generate_constructor_params(signal))
+
+            signal_definition += SIGNAL_DEFINITION_OSTREAM_FMT.format(
+                name=signal.name,
+                message_name=message.name,
+                body=_signal_ostream_body(message.name, signal))
 
             signal_definition += SIGNAL_DEFINITION_RAW_FMT.format(
                 name=signal.name,
@@ -623,6 +685,7 @@ def _generate_definitions(database_name, messages):
         definition = MESSAGE_DEFINITION_FMT.format(
             signal_definitions='\n'.join(signal_definitions),
             constructor=constructor,
+            ostream=_message_ostream(message),
             static_vars=static_vars,
             signal_setters='\n'.join(signal_setters))
 

@@ -212,7 +212,7 @@ class Signal {
   std::string data_format() const { return data_format_; }
 
   /** Return SPN, 0 if none */
-  uint32_t spn() const { return spn_; }
+  uint32_t SPN() const { return spn_; }
 
  protected:
   // Const pointer to buffer that signal is packed into

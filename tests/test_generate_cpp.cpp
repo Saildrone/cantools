@@ -2,12 +2,14 @@
 // to create interopability between python, c, make, and bazel
 #include <gtest/gtest.h>
 
+#include <sstream>
+
 #include "motohawk.h"
 #include "signed.h"
 #include "css__electronics_sae_j1939_demo.h"
 
 // Copy struct pack/unpack in test_basic.motohawk_example_message_t
-TEST(motohawk_dbc, struct_unpack) {
+TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
     uint8_t buffer[] = "\xc0\x06\xe0\x00\x00\x00\x00\x00";
     ExampleMessage m(buffer, 8u);
 
@@ -36,7 +38,7 @@ TEST(motohawk_dbc, struct_unpack) {
     }
 }
 
-TEST(motohawk_dbc, struct_pack) {
+TEST(GenerateCpp, test_StructPack_Motohawk_DBC) {
     ExampleMessage m;
 
     // Set Enable and confirm
@@ -55,7 +57,7 @@ TEST(motohawk_dbc, struct_pack) {
     EXPECT_EQ(250, m.Temperature.Real());
 }
 
-TEST(signed_dbc, struct_pack) {
+TEST(GenerateCpp, test_StructPack_Signed_DBC) {
     Message64 m;
 
     EXPECT_TRUE(m.set_s64(-5));
@@ -67,7 +69,7 @@ TEST(signed_dbc, struct_pack) {
     EXPECT_EQ("0000000000000000", m.ToString());
 }
 
-TEST(css__electronics_sae_j1939_demo, spns) {
+TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939_DBC) {
     EEC1 eec1;
     CCVS1 ccvs1;
 
@@ -78,6 +80,29 @@ TEST(css__electronics_sae_j1939_demo, spns) {
     EXPECT_EQ(EEC1::cycle_time_ms, 500);
     EXPECT_EQ(CCVS1::ID, 0x18fef1fe);
     EXPECT_EQ(CCVS1::PGN, 0xfef1);
+}
+
+TEST(GenerateCpp, test_OstreamOperator_Motohawk_DBC) {
+    ExampleMessage m;
+    m.set_Temperature(250);
+    m.set_AverageRadius(0.25);
+    m.set_Enable(0);
+
+    std::stringstream os;
+    os << m.AverageRadius;
+    EXPECT_EQ(os.str(), "0.2 m");
+    
+    os.str(std::string());
+    os << m.Temperature;
+    EXPECT_EQ(os.str(), "250 degK");
+
+    os.str(std::string());
+    os << m.Enable;
+    EXPECT_EQ(os.str(), "0");
+
+    os.str(std::string());
+    os << m;
+    EXPECT_EQ(os.str(), "Enable: 0  AverageRadius: 0.2 m  Temperature: 250 degK");
 }
 
 int main(int argc, char **argv) {
