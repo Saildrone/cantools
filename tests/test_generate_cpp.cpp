@@ -73,8 +73,8 @@ TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939_DBC) {
     EEC1 eec1;
     CCVS1 ccvs1;
 
-    EXPECT_EQ(eec1.EngineSpeed.SPN(), 190);
-    EXPECT_EQ(ccvs1.WheelBasedVehicleSpeed.SPN(), 84);
+    EXPECT_EQ(eec1.EngineSpeed.spn(), 190);
+    EXPECT_EQ(ccvs1.WheelBasedVehicleSpeed.spn(), 84);
     
     // Test static member vars
     EXPECT_EQ(EEC1::cycle_time_ms, 500);
