@@ -596,7 +596,7 @@ def _signal_ostream_body(message_name, signal):
             else:
                 ostream_body += f'\n{CPP_TAB}}} else if (signal.Real() == {message_name}_{signal.name}::{_format_enum_name(name)}) {{'
                 ostream_body += f'\n{CPP_TAB}{CPP_TAB}os << "' + _format_enum_name(name).split('k', 1)[1] + '";'
-        ostream_body += f'\n{CPP_TAB}}} else {{\n{CPP_TAB}{CPP_TAB}os << "UNDEFINED";'
+        ostream_body += f'\n{CPP_TAB}}} else {{\n{CPP_TAB}{CPP_TAB}os << "UNDEFINED";\n{CPP_TAB}}}'
     else:
         ostream_body = f'    os << signal.Real()'
         if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
