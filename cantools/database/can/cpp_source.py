@@ -86,6 +86,8 @@ SOURCE_FMT = '''\
 
 #include "{header}"
 
+#include <iostream>
+
 {definitions}\
 '''
 
@@ -599,9 +601,12 @@ def _signal_ostream_body(message_name, signal):
                 ostream_body += f'\n{CPP_TAB}{CPP_TAB}os << "' + _format_enum_name(name).split('k', 1)[1] + '";'
         ostream_body += f'\n{CPP_TAB}}} else {{\n{CPP_TAB}{CPP_TAB}os << "UNDEFINED";\n{CPP_TAB}}}'
     else:
-        ostream_body = f'    os << signal.Real()'
+        if signal.unit.lower() != 'bool':
+            ostream_body = f'    os << signal.Real()'
+        else:
+            ostream_body = f'    os << std::boolalpha << signal.Real()'
         if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
-           signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
+           signal.unit.lower() != 'bool' and signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
             ostream_body += f' << " " << signal.data_format()'
         ostream_body += ';'
     return ostream_body
