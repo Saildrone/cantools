@@ -197,6 +197,7 @@ std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal) 
 {body}
     return os;
 }}
+
 '''
 
 SIGNAL_DEFINITION_SET_FMT = '''\
