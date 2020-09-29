@@ -604,7 +604,7 @@ def _signal_ostream_body(message_name, signal):
         if signal.unit.lower() != 'bool':
             ostream_body = f'    os << signal.Real()'
         else:
-            ostream_body = f'    os << std::boolalpha << signal.Real()'
+            ostream_body = f'    os << std::boolalpha << signal.Real() << std::noboolalpha'
         if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
            signal.unit.lower() != 'bool' and signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
             ostream_body += f' << " " << signal.data_format()'
