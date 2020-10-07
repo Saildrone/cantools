@@ -194,19 +194,15 @@ class Signal {
 
   /** Confirm if physical engineering units value in range */
   bool InRange(const PhysicalDataType& value) const {
-    RawDataType enable = Encode(value);
-    return RawInRange(enable);
+    RawDataType raw = Encode(value);
+    return RawInRange(raw);
   }
 
   /** Decode given signal by applying scaling and offset. */
-  PhysicalDataType Decode(RawDataType value) const {
-    return ((static_cast<PhysicalDataType>(value) * scale_factor_) + offset_);
-  }
+  virtual PhysicalDataType Decode(RawDataType value) const = 0;
 
   /** Encode given signal by applying scaling and offset. */
-  RawDataType Encode(PhysicalDataType value) const {
-    return static_cast<RawDataType>((value - offset_) / scale_factor_);
-  }
+  virtual RawDataType Encode(PhysicalDataType value) const = 0;
 
   /** Return string of data format, empty if none */
   std::string data_format() const { return data_format_; }
