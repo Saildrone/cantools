@@ -89,7 +89,7 @@ SOURCE_FMT = '''\
 
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
+#include <ostream>
 
 {definitions}\
 '''
@@ -656,11 +656,9 @@ def _signal_ostream_body(message_name, signal):
 
 def _signal_decode_body(signal):
     if _signal_physical_type_is_string(signal):
-        return f'{CPP_TAB}std::stringstream sstream;\n' \
-               f'{CPP_TAB}unsigned char char_arr[sizeof(value)];\n' \
+        return f'{CPP_TAB}unsigned char char_arr[sizeof(value)];\n' \
                f'{CPP_TAB}std::memcpy(char_arr, &value, sizeof(value));\n' \
-               f'{CPP_TAB}sstream << char_arr;\n' \
-               f'{CPP_TAB}return sstream.str();'
+               f'{CPP_TAB}return std::string(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));'
     else:
         return f'{CPP_TAB}' + DEFAULT_SIGNAL_DECODE_BODY.format(physical_type=_signal_physical_type(signal))
 
