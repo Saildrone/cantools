@@ -658,14 +658,17 @@ def _signal_decode_body(signal):
     if _signal_physical_type_is_string(signal):
         return f'{CPP_TAB}unsigned char char_arr[sizeof(value)];\n' \
                f'{CPP_TAB}std::memcpy(char_arr, &value, sizeof(value));\n' \
-               f'{CPP_TAB}return std::string(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));'
+               f'{CPP_TAB}std::string out(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));\n' \
+               f'{CPP_TAB}out.resize(strlen(out.c_str()));\n' \
+               f'{CPP_TAB}return out;'
     else:
         return f'{CPP_TAB}' + DEFAULT_SIGNAL_DECODE_BODY.format(physical_type=_signal_physical_type(signal))
 
 def _signal_encode_body(signal):
     if _signal_physical_type_is_string(signal):
-        return f'{CPP_TAB}char *end;\n' \
-               f'{CPP_TAB}return std::strtoull(value.data(), &end, 10);'
+        return f'{CPP_TAB}uint64_t out = 0;\n' \
+               f'{CPP_TAB}std::memcpy(&out, value.c_str(), sizeof(out));\n' \
+               f'{CPP_TAB}return out;'
     else:
         return f'{CPP_TAB}' + DEFAULT_SIGNAL_ENCODE_BODY.format(type_name=signal.type_name)
 
