@@ -648,7 +648,7 @@ def _signal_ostream_body(message_name, signal):
             ostream_body = f'{CPP_TAB}os << signal.Real()'
         else:
             ostream_body = f'{CPP_TAB}os << std::boolalpha << signal.Real() << std::noboolalpha'
-        if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
+        if signal.unit.lower() != 'string' and signal.unit.lower() != 'str' and signal.unit.lower() != 'enum' and \
            signal.unit.lower() != 'bool' and signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
             ostream_body += f' << " " << signal.data_format()'
         ostream_body += ';'
