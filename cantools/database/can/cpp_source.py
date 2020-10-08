@@ -119,11 +119,6 @@ public:
 }};
 '''
 
-# SIGNAL_DECLARATION_OVERRIDES = '''\
-#     virtual {physical_type} Decode({type_name} value) const override;
-#     virtual {type_name} Encode({physical_type} value) const override;
-# '''
-
 MESSAGE_DECLARATION_FMT = '''\
 {signal_constructors}
 
@@ -259,13 +254,6 @@ def _signal_physical_type_is_string(signal):
 
 def _signal_physical_type(signal):
     return 'std::string' if _signal_physical_type_is_string(signal) else 'double'
-
-# def _signal_overrides(signal):
-#     if _signal_physical_type_is_string(signal):
-#         return SIGNAL_DECLARATION_OVERRIDES.format(
-#             type_name=signal.type_name,
-#             physical_type=_signal_physical_type(signal))
-#     return ''
 
 def _generate_signal_declaration(signal, message_name):
     comment = _format_comment_no_tabs(signal.comment)
@@ -728,9 +716,6 @@ def _generate_definitions(database_name, messages):
                 type_name=signal.type_name,
                 check=range_checks[signal_iter])
 
-            # If signal physical data type is string, have specialized functionality for Signal::Encode and
-            # Signal::Decode
-            # if _signal_physical_type_is_string(signal):
             signal_definition += SIGNAL_DEFINITION_DECODE_FMT.format(
                 name=signal.name,
                 message_name=message.name,
