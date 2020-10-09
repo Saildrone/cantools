@@ -582,8 +582,19 @@ def _generate_declarations(database_name, messages):
 
 def _compute_pgn(id: int):
     PGN_OFFSET = 8
-    PGN_MASK = 0x3FFFF
-    pgn = (id >> PGN_OFFSET) & PGN_MASK
+    PGN_MASK = 0x3ffff
+    DATA_PAGE_OFFSET = 24
+    DATA_PAGE_MASK = 1
+    PDU_FORMAT_OFFSET = 16
+    PDU_FORMAT_MASK = 0xff
+
+    data_page = (DATA_PAGE_OFFSET >> 24) & DATA_PAGE_MASK
+    pdu_format = (id >> PDU_FORMAT_OFFSET) & PDU_FORMAT_MASK
+
+    if pdu_format < 240:    # PDU1
+        pgn = (data_page << 9) | (pdu_format << 8)
+    else:                   # PDU2
+        pgn = (id >> PGN_OFFSET) & PGN_MASK
     return f'{hex(pgn)}'
 
 def _signal_ostream_body(message_name, signal):
