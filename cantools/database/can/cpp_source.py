@@ -581,21 +581,38 @@ def _generate_declarations(database_name, messages):
 
 
 def _compute_pgn(id: int):
-    PGN_OFFSET = 8
-    PGN_MASK = 0x3ffff
-    DATA_PAGE_OFFSET = 24
-    DATA_PAGE_MASK = 1
-    PDU_FORMAT_OFFSET = 16
-    PDU_FORMAT_MASK = 0xff
+    RESERVED_OFFSET = 25
+    RESERVED_OFFSET_PGN = 17
+    RESERVED_MASK = 0x02000000
 
-    data_page = (DATA_PAGE_OFFSET >> 24) & DATA_PAGE_MASK
-    pdu_format = (id >> PDU_FORMAT_OFFSET) & PDU_FORMAT_MASK
+    DATA_PAGE_OFFSET = 24
+    DATA_PAGE_OFFSET_PGN = 16
+    DATA_PAGE_MASK = 0x01000000
+
+    PDU_SPECIFIC_OFFSET = 8
+    PDU_SPECIFIC_MASK = 0xff00
+
+    PDU_FORMAT_OFFSET = 16
+    PDU_FORMAT_OFFSET_PGN = 8
+    PDU_FORMAT_MASK = 0xff0000
+
+    GROUP_EXTENSION_OFFSET_PGN = 0
+
+    reserved = (id & RESERVED_MASK) >> RESERVED_OFFSET
+    data_page = (id & DATA_PAGE_MASK) >> DATA_PAGE_OFFSET
+    pdu_specific = (id & PDU_SPECIFIC_MASK) >> PDU_SPECIFIC_OFFSET
+    pdu_format = (id & PDU_FORMAT_MASK) >> PDU_FORMAT_OFFSET
 
     if pdu_format < 240:    # PDU1
-        pgn = (data_page << 9) | (pdu_format << 8)
+        group_extension = 0
     else:                   # PDU2
-        pgn = (id >> PGN_OFFSET) & PGN_MASK
+        group_extension = pdu_specific
+
+    pgn = 0
+    pgn |= (group_extension << GROUP_EXTENSION_OFFSET_PGN) | (pdu_format << PDU_FORMAT_OFFSET_PGN) | \
+           (data_page << DATA_PAGE_OFFSET_PGN) | (reserved << RESERVED_OFFSET_PGN)
     return f'{hex(pgn)}'
+
 
 def _signal_ostream_body(message_name, signal):
 
@@ -622,6 +639,7 @@ def _signal_ostream_body(message_name, signal):
         ostream_body += ';'
     return ostream_body
 
+
 def _message_ostream(message):
     ostream_body = f'    os << '
     for signal in message.signals:
@@ -633,6 +651,7 @@ def _message_ostream(message):
     return MESSAGE_DEFINITION_OSTREAM_FMT.format(
         database_message_name=message.name,
         body=ostream_body)
+
 
 def _generate_definitions(database_name, messages):
     definitions = []
