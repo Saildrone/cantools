@@ -2,6 +2,8 @@
 #define CANTOOLS_DBC_H
 
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <memory>
 #include <string>
@@ -199,10 +201,88 @@ class Signal {
   }
 
   /** Decode given signal by applying scaling and offset. */
-  virtual PhysicalDataType Decode(RawDataType value) const = 0;
+  virtual PhysicalDataType Decode(RawDataType value) const {
+    return ((static_cast<PhysicalDataType>(value) * scale_factor_) + offset_);
+  }
 
   /** Encode given signal by applying scaling and offset. */
-  virtual RawDataType Encode(PhysicalDataType value) const = 0;
+  virtual RawDataType Encode(PhysicalDataType value) const {
+    return static_cast<RawDataType>((value - offset_) / scale_factor_);
+  }
+
+  /** Return string of data format, empty if none */
+  std::string data_format() const { return data_format_; }
+
+  /** Return SPN, 0 if none */
+  uint32_t spn() const { return spn_; }
+
+ protected:
+  // Const pointer to buffer that signal is packed into
+  const uint8_t* buffer_;
+
+  // Signal name
+  std::string name_;
+
+  // Offset value used for encode/decode, unitless
+  double offset_ {0.0};
+
+  // Scale factor used for encode/decode, unitless
+  double scale_factor_ {1.0};
+
+  // Data format name
+  std::string data_format_ {""};
+
+  // Suspect Parameter Number (SPN) for J1939 signal
+  uint32_t spn_ {J1939_INVALID_SPN};
+};
+
+/** Partial template specialization for std::string PhysicalDataType */
+template<typename RawDataType>
+class Signal<RawDataType, std::string> {
+ public:
+  Signal(const uint8_t* buffer, const std::string& name)
+      : buffer_(buffer),
+        name_(name) {}
+
+  Signal(const uint8_t* buffer, const std::string& name, const double offset,
+         const double scale, const std::string& data_format, const uint32_t spn)
+      : buffer_(buffer),
+        name_(name),
+        offset_(offset),
+        scale_factor_(scale),
+        data_format_(data_format),
+        spn_(spn) {}
+
+  /** Unpack signal from buffer */
+  virtual RawDataType Raw() const = 0;
+
+  /** Confirm if raw signal within acceptable range */
+  virtual bool RawInRange(const RawDataType& value) const = 0;  
+
+  /** Unpacked signal from buffer, decoded and converted to physical engineering units */
+  std::string Real() const { return Decode(Raw()); }
+
+  /** Confirm if physical engineering units value in range */
+  bool InRange(const std::string& value) const {
+    RawDataType raw = Encode(value);
+    return RawInRange(raw);
+  }
+
+  /** Decode given signal by applying scaling and offset. */
+  virtual std::string Decode(RawDataType value) const {
+    unsigned char char_arr[sizeof(value)];
+    std::memcpy(char_arr, &value, sizeof(value));
+    std::string out(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));
+    out.resize(strlen(out.c_str()));
+    return out;
+  }
+
+  /** Encode given signal by applying scaling and offset. */
+  virtual RawDataType Encode(std::string value) const {
+    uint64_t out = 0;
+    std::memcpy(&out, value.c_str(), sizeof(out));
+    return out;
+  }
 
   /** Return string of data format, empty if none */
   std::string data_format() const { return data_format_; }

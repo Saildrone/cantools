@@ -45,7 +45,6 @@ HEADER_FMT = '''\
 #define {include_guard}
 
 #include <ostream>
-#include <string>
 
 #include "DBC.h"
 
@@ -87,10 +86,6 @@ SOURCE_FMT = '''\
 
 #include "{header}"
 
-#include <cstdlib>
-#include <cstring>
-#include <ostream>
-
 {definitions}\
 '''
 
@@ -112,8 +107,6 @@ public:
 
     virtual {type_name} Raw() const override;
     virtual bool RawInRange(const {type_name}& value) const override;
-    virtual {physical_type} Decode({type_name} value) const override;
-    virtual {type_name} Encode({physical_type} value) const override;
 
     friend std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal);
 }};
@@ -175,20 +168,6 @@ SIGNAL_DEFINITION_RAW_FMT = '''\
 SIGNAL_DEFINITION_RAW_IN_RANGE_FMT = '''\
 bool {message_name}_{name}::RawInRange(const {type_name}& value) const {{
     return ({check});
-}}
-'''
-
-SIGNAL_DEFINITION_DECODE_FMT = '''\
-
-{physical_type} {message_name}_{name}::Decode({type_name} value) const {{
-{contents}
-}}
-
-'''
-
-SIGNAL_DEFINITION_ENCODE_FMT = '''\
-{type_name} {message_name}_{name}::Encode({physical_type} value) const {{
-{contents}
 }}
 '''
 
@@ -276,7 +255,6 @@ def _generate_signal_declaration(signal, message_name):
                                            additional_comments=_format_comment_no_tabs(additional_comments),
                                            type_name=signal.type_name,
                                            physical_type=_signal_physical_type(signal))
-                                        #    optional_overrides=_signal_overrides(signal))
     return member
 
 
@@ -670,24 +648,6 @@ def _signal_ostream_body(message_name, signal):
         ostream_body += ';'
     return ostream_body
 
-def _signal_decode_body(signal):
-    if _signal_physical_type_is_string(signal):
-        return f'{CPP_TAB}unsigned char char_arr[sizeof(value)];\n' \
-               f'{CPP_TAB}std::memcpy(char_arr, &value, sizeof(value));\n' \
-               f'{CPP_TAB}std::string out(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));\n' \
-               f'{CPP_TAB}out.resize(strlen(out.c_str()));\n' \
-               f'{CPP_TAB}return out;'
-    else:
-        return f'{CPP_TAB}' + DEFAULT_SIGNAL_DECODE_BODY.format(physical_type=_signal_physical_type(signal))
-
-def _signal_encode_body(signal):
-    if _signal_physical_type_is_string(signal):
-        return f'{CPP_TAB}uint64_t out = 0;\n' \
-               f'{CPP_TAB}std::memcpy(&out, value.c_str(), sizeof(out));\n' \
-               f'{CPP_TAB}return out;'
-    else:
-        return f'{CPP_TAB}' + DEFAULT_SIGNAL_ENCODE_BODY.format(type_name=signal.type_name)
-
 def _message_ostream(message):
     ostream_body = f'    os << '
     for signal in message.signals:
@@ -744,20 +704,6 @@ def _generate_definitions(database_name, messages):
                 message_name=message.name,
                 type_name=signal.type_name,
                 check=range_checks[signal_iter])
-
-            signal_definition += SIGNAL_DEFINITION_DECODE_FMT.format(
-                name=signal.name,
-                message_name=message.name,
-                type_name=signal.type_name,
-                physical_type=_signal_physical_type(signal),
-                contents=_signal_decode_body(signal))
-
-            signal_definition += SIGNAL_DEFINITION_ENCODE_FMT.format(
-                name=signal.name,
-                message_name=message.name,
-                type_name=signal.type_name,
-                physical_type=_signal_physical_type(signal),
-                contents=_signal_encode_body(signal))
 
             signal_definitions.append(signal_definition)
 
