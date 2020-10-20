@@ -224,11 +224,13 @@ def _format_comment_no_tabs(comment):
     else:
         return ''
 
+
 # TODO this should evaluate outputs to integers/bools as well, just not only std::string or double
 def _signal_physical_type(signal):
     if signal.unit and (signal.unit.lower() == 'string' or signal.unit.lower() == 'str'):
         return 'std::string'
     return 'double'
+
 
 def _generate_signal_declaration(signal, message_name):
     comment = _format_comment_no_tabs(signal.comment)
