@@ -86,6 +86,8 @@ SOURCE_FMT = '''\
 
 #include "{header}"
 
+#include <ostream>
+
 {definitions}\
 '''
 
@@ -134,10 +136,6 @@ public:
 {static_vars}
 }};
 '''
-
-DEFAULT_SIGNAL_DECODE_BODY = 'return ((static_cast<{physical_type}>(value) * scale_factor_) + offset_);'
-
-DEFAULT_SIGNAL_ENCODE_BODY = 'return static_cast<{type_name}>((value - offset_) / scale_factor_);'
 
 MESSAGE_SIGNAL_SETTER_DECLARATION_FMT = '''\
 bool set_{name}(const double& value);
