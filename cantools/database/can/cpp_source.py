@@ -457,7 +457,8 @@ def _generate_message_declaration(message):
     static_vars = f'\n    // Public static accessor for const message attributes (cycle time, ID, etc.)\n' \
                   f'    static const uint32_t cycle_time_ms;\n' \
                   f'    static const uint8_t length;\n' \
-                  f'    static const uint32_t ID;\n'
+                  f'    static const uint32_t ID;\n' \
+                  f'    static const uint priority;\n'
     if message.protocol == 'j1939':
         static_vars += f'    static const uint32_t PGN;\n'
     return signal_constructors, comment, signal_setters, signals, static_vars
@@ -578,6 +579,12 @@ def _generate_declarations(database_name, messages):
                 static_vars=static_vars))
 
     return '\n'.join(classes)
+
+
+def _compute_priority(id: int):
+    PRIORITY_OFFSET = 26
+    PRIORITY_MASK = 0x1C000000
+    return (id & PRIORITY_MASK) >> PRIORITY_OFFSET
 
 
 def _compute_pgn(id: int):
@@ -715,6 +722,7 @@ def _generate_definitions(database_name, messages):
         static_vars = f'const uint32_t {message.name}::cycle_time_ms = {cycle_time};\n'
         static_vars += f'const uint8_t {message.name}::length = {message.length}u;\n'
         static_vars += f'const uint32_t {message.name}::ID = {frame_id}u;\n'
+        static_vars += f'const uint {message.name}::priority = {_compute_priority(message.frame_id)};\n'
         if message.protocol == 'j1939':
             static_vars += f'const uint32_t {message.name}::PGN = {_compute_pgn(message.frame_id)};\n'
 
