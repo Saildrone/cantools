@@ -201,12 +201,12 @@ class Signal {
   }
 
   /** Decode given signal by applying scaling and offset. */
-  virtual PhysicalDataType Decode(RawDataType value) const {
+  PhysicalDataType Decode(RawDataType value) const {
     return ((static_cast<PhysicalDataType>(value) * scale_factor_) + offset_);
   }
 
   /** Encode given signal by applying scaling and offset. */
-  virtual RawDataType Encode(PhysicalDataType value) const {
+  RawDataType Encode(PhysicalDataType value) const {
     return static_cast<RawDataType>((value - offset_) / scale_factor_);
   }
 
@@ -269,7 +269,7 @@ class Signal<RawDataType, std::string> {
   }
 
   /** Decode given signal by applying scaling and offset. */
-  virtual std::string Decode(RawDataType value) const {
+  std::string Decode(RawDataType value) const {
     unsigned char char_arr[sizeof(value)];
     std::memcpy(char_arr, &value, sizeof(value));
     std::string out(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));
@@ -278,7 +278,7 @@ class Signal<RawDataType, std::string> {
   }
 
   /** Encode given signal by applying scaling and offset. */
-  virtual RawDataType Encode(std::string value) const {
+  RawDataType Encode(std::string value) const {
     uint64_t out = 0;
     std::memcpy(&out, value.c_str(), sizeof(out));
     return out;
