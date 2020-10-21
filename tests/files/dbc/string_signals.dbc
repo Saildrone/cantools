@@ -41,4 +41,4 @@ BO_ 10 PersonName: 42 Vector___XXX
  SG_ age : 160|8@1+ (1,0) [0|254] "years" Vector__XXX
  SG_ last_name : 168|160@1+ (1,0) [0|0] "str" Vector__XXX
  SG_ height : 328|7@1+ (1,0) [0|0] "inches" Vector__XXX
- SG_ _reserved : 335|1@1+ (1,0) [0|0] "" Vector__XXX
+ SG_ alive : 335|1@1+ (1,0) [0|0] "Bool" Vector__XXX
