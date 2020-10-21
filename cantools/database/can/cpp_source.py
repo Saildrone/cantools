@@ -646,7 +646,7 @@ def _signal_ostream_body(message_name, signal):
         if signal.unit.lower() != 'bool':
             ostream_body = f'{CPP_TAB}os << signal.Real()'
         else:
-            // TODO static_cast<bool> around signal until bool is a PhysicalDataType option
+            # TODO static_cast<bool> around signal until bool is a PhysicalDataType option
             ostream_body = f'{CPP_TAB}os << std::boolalpha << static_cast<bool>(signal.Real()) << std::noboolalpha'
         if signal.unit.lower() != 'string' and signal.unit.lower() != 'str' and signal.unit.lower() != 'enum' and \
            signal.unit.lower() != 'bool' and signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
