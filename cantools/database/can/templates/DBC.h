@@ -270,9 +270,7 @@ class Signal<RawDataType, std::string> {
 
   /** Decode given signal by applying scaling and offset. */
   std::string Decode(RawDataType value) const {
-    unsigned char char_arr[sizeof(value)];
-    std::memcpy(char_arr, &value, sizeof(value));
-    std::string out(reinterpret_cast<const char*>(char_arr), sizeof(char_arr) / sizeof(char_arr[0]));
+    std::string out(reinterpret_cast<const char*>(&value), sizeof(value));
     out.resize(strlen(out.c_str()));
     return out;
   }
