@@ -110,6 +110,8 @@ TEST(GenerateCpp, test_SignalStringType_String_DBC) {
     PersonName full_name;
     full_name.set_first_name("John");
     full_name.set_last_name("Doe");
+    full_name.set_height(67);
+    full_name.set_age(26);
 
     std::stringstream os;
     os << full_name.first_name;
@@ -120,8 +122,17 @@ TEST(GenerateCpp, test_SignalStringType_String_DBC) {
     EXPECT_EQ(os.str(), "Doe");
 
     os.str(std::string());
+    os << full_name.height;
+    EXPECT_EQ(os.str(), "67 inches");
+
+    os.str(std::string());
+    os << full_name.age;
+    EXPECT_EQ(os.str(), "26 years");
+
+
+    os.str(std::string());
     os << full_name;
-    EXPECT_EQ(os.str(), "first_name: John  last_name: Doe");
+    EXPECT_EQ(os.str(), "first_name: John  age: 26 years  last_name: Doe  height: 67 inches  _reserved: 0");
 }
 
 int main(int argc, char **argv) {

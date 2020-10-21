@@ -36,6 +36,9 @@ BS_:
 BU_:
 
 
-BO_ 10 PersonName: 40 Vector___XXX
+BO_ 10 PersonName: 42 Vector___XXX
  SG_ first_name : 0|160@1+ (1,0) [0|0] "String" Vector__XXX
- SG_ last_name : 160|160@1+ (1,0) [0|0] "str" Vector__XXX
+ SG_ age : 160|8@1+ (1,0) [0|254] "years" Vector__XXX
+ SG_ last_name : 168|160@1+ (1,0) [0|0] "str" Vector__XXX
+ SG_ height : 328|7@1+ (1,0) [0|0] "inches" Vector__XXX
+ SG_ _reserved : 335|1@1+ (1,0) [0|0] "" Vector__XXX
