@@ -86,7 +86,7 @@ SOURCE_FMT = '''\
 
 #include "{header}"
 
-#include <iostream>
+#include <ostream>
 
 {definitions}\
 '''
@@ -102,7 +102,7 @@ SIGNAL_DECLARATION_FMT = '''\
  * Offset: {offset}
 {additional_comments}\
  */
-class {message_name}_{name} : public Signal<{type_name}, double> {{
+class {message_name}_{name} : public Signal<{type_name}, {physical_type}> {{
 public:
     {choices}
     {message_name}_{name}(const uint8_t* buffer);
@@ -171,17 +171,17 @@ bool {message_name}_{name}::RawInRange(const {type_name}& value) const {{
 
 MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
 {database_message_name}::{database_message_name}()
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u),
 {signals}
 {{}}
 
 {database_message_name}::{database_message_name}(std::unique_ptr<uint8_t[]>&& other, const size_t size)
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, std::move(other), size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, std::move(other), size),
 {signals}
 {{}}
 
 {database_message_name}::{database_message_name}(uint8_t* buffer, const size_t size)
-    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, buffer, size)
+    : Frame({id}u, "{database_message_name}", {length}u, {extended}, {cycle_time}u, buffer, size),
 {signals}
 {{}}
 '''
@@ -189,22 +189,21 @@ MESSAGE_CONSTRUCTOR_DEFINITION_FMT = '''\
 
 MESSAGE_DEFINITION_OSTREAM_FMT = '''\
 std::ostream& operator<<(std::ostream& os, const {database_message_name}& frame) {{
-{body}
+{contents}
     return os;
 }}
 '''
 
 SIGNAL_DEFINITION_OSTREAM_FMT = '''\
 std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal) {{
-{body}
+{contents}
     return os;
 }}
 
 '''
 
 SIGNAL_DEFINITION_SET_FMT = '''\
-bool {database_message_name}::set_{name}(const double& value) {{
-
+bool {database_message_name}::set_{name}(const {physical_type}& value) {{
 {contents}
 }}
 '''
@@ -226,6 +225,19 @@ def _format_comment_no_tabs(comment):
         return ''
 
 
+# TODO this should evaluate outputs to integers/bools as well, just not only std::string or double
+# This would require all input DBC files to be modified so that each signal has a corresponding
+# SIG_VALTYPE_ attribute in the signal_valtype_list section. See reference, pg 5-6:
+# http://read.pudn.com/downloads766/ebook/3041455/DBC_File_Format_Documentation.pdf
+# If this is done then can use signal.type_name, with some simple code to determine if the signal is
+# a boolean (1 bit size). Then can make use of Signal template param PhysicalDataType accurately, as
+# well as hardcode the `std::ostream& operator<<(` with partial template specialization.
+def _signal_physical_type(signal):
+    if signal.unit and (signal.unit.lower() == 'string' or signal.unit.lower() == 'str'):
+        return 'std::string'
+    return 'double'
+
+
 def _generate_signal_declaration(signal, message_name):
     comment = _format_comment_no_tabs(signal.comment)
     range_ = _format_range(signal)
@@ -245,7 +257,8 @@ def _generate_signal_declaration(signal, message_name):
                                            scale=scale,
                                            offset=offset,
                                            additional_comments=_format_comment_no_tabs(additional_comments),
-                                           type_name=signal.type_name)
+                                           type_name=signal.type_name,
+                                           physical_type=_signal_physical_type(signal))
     return member
 
 
@@ -446,7 +459,7 @@ def _generate_message_declaration(message):
 
     for signal in message.signals:
         signal_constructors.append(_generate_signal_declaration(signal, message.name))
-        signal_setters.append(f'    bool set_{signal.name}(const double& value);')
+        signal_setters.append(f'    bool set_{signal.name}(const {_signal_physical_type(signal)}& value);')
         signals.append(f'    {message.name}_{signal.name} {signal.name};')
 
     if message.comment is None:
@@ -637,15 +650,15 @@ def _signal_ostream_body(message_name, signal):
         ostream_body += f'\n{CPP_TAB}}} else {{\n{CPP_TAB}{CPP_TAB}os << "UNDEFINED";\n{CPP_TAB}}}'
     else:
         if signal.unit.lower() != 'bool':
-            ostream_body = f'    os << signal.Real()'
+            ostream_body = f'{CPP_TAB}os << signal.Real()'
         else:
-            ostream_body = f'    os << std::boolalpha << signal.Real() << std::noboolalpha'
-        if signal.unit.lower() != 'string' and signal.unit.lower() != 'enum' and \
+            # TODO static_cast<bool> around signal until bool is a PhysicalDataType option
+            ostream_body = f'{CPP_TAB}os << std::boolalpha << static_cast<bool>(signal.Real()) << std::noboolalpha'
+        if signal.unit.lower() != 'string' and signal.unit.lower() != 'str' and signal.unit.lower() != 'enum' and \
            signal.unit.lower() != 'bool' and signal.unit != ' ' and signal.unit != '' and signal.unit != '-':
             ostream_body += f' << " " << signal.data_format()'
         ostream_body += ';'
     return ostream_body
-
 
 def _message_ostream(message):
     ostream_body = f'    os << '
@@ -657,7 +670,7 @@ def _message_ostream(message):
 
     return MESSAGE_DEFINITION_OSTREAM_FMT.format(
         database_message_name=message.name,
-        body=ostream_body)
+        contents=ostream_body)
 
 
 def _generate_definitions(database_name, messages):
@@ -676,7 +689,11 @@ def _generate_definitions(database_name, messages):
         for signal_iter, signal in enumerate(message.signals):
             signal_definition = f'// Signal {message.name}.{signal.name}\n'
 
-            signals_in_msg_constructor.append(f'    , {signal.name}(buffer_)')
+            signal_msg_constructor = f'{CPP_TAB}  {signal.name}(buffer_)'
+            # Commas after every member variable initializer except last
+            if signal != message.signals[-1]:
+                signal_msg_constructor += ','
+            signals_in_msg_constructor.append(signal_msg_constructor)
 
             signal_definition += SIGNAL_DEFINITION_FMT.format(
                 name=signal.name,
@@ -686,7 +703,7 @@ def _generate_definitions(database_name, messages):
             signal_definition += SIGNAL_DEFINITION_OSTREAM_FMT.format(
                 name=signal.name,
                 message_name=message.name,
-                body=_signal_ostream_body(message.name, signal))
+                contents=_signal_ostream_body(message.name, signal))
 
             signal_definition += SIGNAL_DEFINITION_RAW_FMT.format(
                 name=signal.name,
@@ -695,7 +712,6 @@ def _generate_definitions(database_name, messages):
                 contents = unpack[signal.name])
 
             signal_definition += SIGNAL_DEFINITION_RAW_IN_RANGE_FMT.format(
-                database_message_name=message.name,
                 name=signal.name,
                 message_name=message.name,
                 type_name=signal.type_name,
@@ -706,6 +722,7 @@ def _generate_definitions(database_name, messages):
             signal_setters.append(SIGNAL_DEFINITION_SET_FMT.format(
                 database_message_name=message.name,
                 name=signal.name,
+                physical_type=_signal_physical_type(signal),
                 contents = pack[signal.name]))
 
         cycle_time = message.cycle_time if message.cycle_time else '0'
@@ -758,7 +775,7 @@ def generate(database,
     """
     date = time.ctime()
     messages = [Message(message) for message in database.messages]
-    include_guard = '{}_H'.format(database_name.upper())
+    include_guard = 'CANTOOLS_{}_H'.format(database_name.upper())
     declarations = _generate_declarations(database_name, messages)
 
     definitions = _generate_definitions(database_name, messages)

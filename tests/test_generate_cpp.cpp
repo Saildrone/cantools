@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "motohawk.h"
+#include "string_signals.h"
 #include "signed.h"
 #include "css__electronics_sae_j1939_demo.h"
 
@@ -103,6 +104,39 @@ TEST(GenerateCpp, test_OstreamOperator_Motohawk_DBC) {
     os.str(std::string());
     os << m;
     EXPECT_EQ(os.str(), "Enable: 0  AverageRadius: 0.2 m  Temperature: 250 degK");
+}
+
+TEST(GenerateCpp, test_SignalStringType_String_DBC) {
+    PersonName full_name;
+    full_name.set_first_name("John");
+    full_name.set_last_name("Doe");
+    full_name.set_height(67);
+    full_name.set_age(26);
+    full_name.set_alive(true);
+
+    std::stringstream os;
+    os << full_name.first_name;
+    EXPECT_EQ(os.str(), "John");
+
+    os.str(std::string());
+    os << full_name.last_name;
+    EXPECT_EQ(os.str(), "Doe");
+
+    os.str(std::string());
+    os << full_name.height;
+    EXPECT_EQ(os.str(), "67 inches");
+
+    os.str(std::string());
+    os << full_name.age;
+    EXPECT_EQ(os.str(), "26 years");
+
+    os.str(std::string());
+    os << full_name.alive;
+    EXPECT_EQ(os.str(), "true");
+
+    os.str(std::string());
+    os << full_name;
+    EXPECT_EQ(os.str(), "first_name: John  age: 26 years  last_name: Doe  height: 67 inches  alive: true");
 }
 
 int main(int argc, char **argv) {
