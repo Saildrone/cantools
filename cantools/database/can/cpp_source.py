@@ -226,6 +226,12 @@ def _format_comment_no_tabs(comment):
 
 
 # TODO this should evaluate outputs to integers/bools as well, just not only std::string or double
+# This would require all input DBC files to be modified so that each signal has a corresponding
+# SIG_VALTYPE_ attribute in the signal_valtype_list section. See reference, pg 5-6:
+# http://read.pudn.com/downloads766/ebook/3041455/DBC_File_Format_Documentation.pdf
+# If this is done then can use signal.type_name, with some simple code to determine if the signal is
+# a boolean (1 bit size). Then can make use of Signal template param PhysicalDataType accurately, as
+# well as hardcode the `std::ostream& operator<<(` with partial template specialization.
 def _signal_physical_type(signal):
     if signal.unit and (signal.unit.lower() == 'string' or signal.unit.lower() == 'str'):
         return 'std::string'
