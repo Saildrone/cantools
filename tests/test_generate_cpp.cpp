@@ -4,10 +4,63 @@
 
 #include <sstream>
 
+#include "css__electronics_sae_j1939_demo.h"
 #include "motohawk.h"
 #include "string_signals.h"
 #include "signed.h"
-#include "css__electronics_sae_j1939_demo.h"
+#include "vehicle.h"
+
+TEST(GenerateCpp, test_SetSignalsMultipleTimes_Vehicle_DBC) {
+    RT_DL1MK3_Speed s;
+    EXPECT_TRUE(s.set_Validity_Speed(1));
+    EXPECT_TRUE(s.set_Accuracy_Speed(100));
+    EXPECT_TRUE(s.set_Speed(-5555));
+
+    EXPECT_EQ(s.Speed.Real(), -5555);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 100);
+    EXPECT_EQ(s.Validity_Speed.Real(), 1);
+
+    EXPECT_TRUE(s.set_Speed(5555));
+    EXPECT_TRUE(s.set_Accuracy_Speed(222));
+    EXPECT_TRUE(s.set_Validity_Speed(0));
+
+    EXPECT_EQ(s.Speed.Real(), 5555);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 222);
+    EXPECT_EQ(s.Validity_Speed.Real(), 0);
+
+    EXPECT_TRUE(s.set_Speed(0));
+    EXPECT_TRUE(s.set_Accuracy_Speed(0));
+    EXPECT_TRUE(s.set_Validity_Speed(1));
+
+    EXPECT_EQ(s.Speed.Real(), 0);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 0);
+    EXPECT_EQ(s.Validity_Speed.Real(), 1);
+
+    RT_SB_INS_Vel_Body_Axes m;
+    EXPECT_TRUE(m.set_Validity_INS_Vel_Forwards(0));
+    EXPECT_TRUE(m.set_Validity_INS_Vel_Sideways(1));
+    EXPECT_TRUE(m.set_Accuracy_INS_Vel_Body(249));
+    EXPECT_TRUE(m.set_INS_Vel_Forwards_2D(-100));
+    EXPECT_TRUE(m.set_INS_Vel_Sideways_2D(100));
+
+    EXPECT_EQ(m.Validity_INS_Vel_Forwards.Real(), 0);
+    EXPECT_EQ(m.Validity_INS_Vel_Sideways.Real(), 1);
+    EXPECT_EQ(m.Accuracy_INS_Vel_Body.Real(), 249);
+    EXPECT_EQ(m.INS_Vel_Forwards_2D.Real(), -100);
+    EXPECT_EQ(m.INS_Vel_Sideways_2D.Real(), 100);
+
+    EXPECT_TRUE(m.set_Validity_INS_Vel_Forwards(1));
+    EXPECT_TRUE(m.set_Validity_INS_Vel_Sideways(0));
+    EXPECT_TRUE(m.set_Accuracy_INS_Vel_Body(50));
+    EXPECT_TRUE(m.set_INS_Vel_Forwards_2D(100));
+    EXPECT_TRUE(m.set_INS_Vel_Sideways_2D(-100));
+
+    EXPECT_EQ(m.Validity_INS_Vel_Forwards.Real(), 1);
+    EXPECT_EQ(m.Validity_INS_Vel_Sideways.Real(), 0);
+    EXPECT_EQ(m.Accuracy_INS_Vel_Body.Real(), 50);
+    EXPECT_EQ(m.INS_Vel_Forwards_2D.Real(), 100);
+    EXPECT_EQ(m.INS_Vel_Sideways_2D.Real(), -100);
+}
 
 // Copy struct pack/unpack in test_basic.motohawk_example_message_t
 TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
@@ -19,8 +72,8 @@ TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
     EXPECT_EQ(32, m.AverageRadius.Raw());
     EXPECT_EQ(55, m.Temperature.Raw());
 
-    // Confirm buffer ToString() accuracy
-    auto str = m.ToString();
+    // Confirm buffer HexString() accuracy
+    auto str = m.HexString();
     EXPECT_EQ(str, "c006e00000000000");
     
     // Confirm input buffer equal to buffer accessor
@@ -64,10 +117,10 @@ TEST(GenerateCpp, test_StructPack_Signed_DBC) {
     EXPECT_TRUE(m.set_s64(-5));
     EXPECT_EQ(-5, m.s64.Raw());
     EXPECT_EQ(-5, m.s64.Real());
-    EXPECT_EQ("fbffffffffffffff", m.ToString());
+    EXPECT_EQ("fbffffffffffffff", m.HexString());
 
     m.Clear();
-    EXPECT_EQ("0000000000000000", m.ToString());
+    EXPECT_EQ("0000000000000000", m.HexString());
 }
 
 TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939_DBC) {

@@ -62,6 +62,7 @@ filegroup(
         "//tests:files/dbc/motohawk.dbc",
         "//tests:files/dbc/signed.dbc",
         "//tests:files/dbc/string_signals.dbc",
+        "//tests:files/dbc/vehicle.dbc",
     ],
 )
 
