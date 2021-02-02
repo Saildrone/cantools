@@ -1,6 +1,7 @@
 #ifndef CANTOOLS_DBC_H
 #define CANTOOLS_DBC_H
 
+#include <bitset>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -89,11 +90,23 @@ class Frame {
         data_length_(buffer_size) {}
 
   /** Accesser to view buffer in string form. */
-  std::string ToString() const {
+  std::string HexString() const {
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');
     for (size_t i = 0; i < data_length_; ++i) {
       oss << std::setw(2) << (unsigned int)buffer_[i];
+    }
+    return oss.str();
+  }
+
+  std::string BinaryString() const {
+    std::ostringstream oss;
+    for (size_t i = 0; i < data_length_; ++i) {
+      std::bitset<8> bs(buffer_[i]);
+      oss << bs;
+      if (i < data_length_ - 1) {
+        oss << " ";
+      }
     }
     return oss.str();
   }

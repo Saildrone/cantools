@@ -131,14 +131,11 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const {database_message_name}& frame);
 
 {signal_setters}
+{signal_clearers}
 
 {signals}
 {static_vars}
 }};
-'''
-
-MESSAGE_SIGNAL_SETTER_DECLARATION_FMT = '''\
-bool set_{name}(const double& value);
 '''
 
 MESSAGE_DEFINITION_FMT = '''\
@@ -147,6 +144,7 @@ MESSAGE_DEFINITION_FMT = '''\
 {ostream}
 {static_vars}
 {signal_setters}
+{signal_clearers}
 '''
 
 SIGNAL_DEFINITION_FMT = '''\
@@ -204,6 +202,12 @@ std::ostream& operator<<(std::ostream& os, const {message_name}_{name}& signal) 
 
 SIGNAL_DEFINITION_SET_FMT = '''\
 bool {database_message_name}::set_{name}(const {physical_type}& value) {{
+{contents}
+}}
+'''
+
+SIGNAL_DEFINITION_CLEAR_FMT = '''\
+void {database_message_name}::clear_{name}() {{
 {contents}
 }}
 '''
@@ -304,8 +308,7 @@ def _format_pack_code_mux(message,
     return [('    ' + line).rstrip() for line in lines]
 
 
-def _format_pack_code_signal(message,
-                             signal_name):
+def _format_pack_code_signal(message, signal_name):
     signal = message.get_signal_by_name(signal_name)
     fmt = '    uint{}_t {}_encoded = {}.Encode(value);\n'
     pack_content = fmt.format(signal.type_length,
@@ -313,7 +316,8 @@ def _format_pack_code_signal(message,
                               signal.name)
 
     body_lines = []
-    body_lines.append(f'    if (!{signal.name}.RawInRange({signal.snake_name}_encoded)) {{\n        return false;\n    }}')
+    body_lines.append(f'{CPP_TAB}if (!{signal.name}.RawInRange({signal.snake_name}_encoded)) {{\n{CPP_TAB}{CPP_TAB}return false;\n    }}')
+    body_lines.append(f'{CPP_TAB}clear_{signal.name}();\n')
 
     for index, shift, shift_direction, mask in signal.segments(invert_shift=False):
         fmt = '    buffer_[{}] |= pack_{}_shift<uint{}_t>({}_encoded, {}u, 0x{:02x}u);'
@@ -328,10 +332,19 @@ def _format_pack_code_signal(message,
     return pack_content + '\n'.join(body_lines)
 
 
+def _format_clear_code_signal(message, signal_name):
+    signal = message.get_signal_by_name(signal_name)
+    body_lines = []
+    for index, _, _, mask in signal.segments(invert_shift=False):
+        fmt = '    buffer_[{}] &= ~0x{:02x}u;'
+        line = fmt.format(index, mask)
+        body_lines.append(line)
+    return '\n'.join(body_lines)
+
+
 def _format_pack_code_level(message,
                             signal_names):
-    """Format one pack level in a signal tree.
-    """
+    """Format one pack level in a signal tree."""
     signal_pack = {}
 
     for signal_name in signal_names:
@@ -345,9 +358,30 @@ def _format_pack_code_level(message,
     return signal_pack
 
 
+def _format_clear_code_level(message,
+                            signal_names):
+    """Format one clear level in a signal tree."""
+    signal_pack = {}
+
+    for signal_name in signal_names:
+        pack = ''
+        if isinstance(signal_name, dict):
+            print('WARNING: Multiplexed signals are not supported')
+        else:
+            pack = _format_clear_code_signal(message,
+                                             signal_name)
+        signal_pack[signal_name] = pack
+    return signal_pack
+
+
 def _format_pack_code(message):
     return _format_pack_code_level(message,
                                    message.signal_tree)
+
+
+def _format_clear_code(message):
+    return _format_clear_code_level(message,
+                                    message.signal_tree)
 
 
 # TODO unused - re-implement if supporting signal multiplexing is desired
@@ -455,11 +489,13 @@ def _format_unpack_code(message):
 def _generate_message_declaration(message):
     signal_constructors = []
     signal_setters = []
+    signal_clearers = []
     signals = []
 
     for signal in message.signals:
         signal_constructors.append(_generate_signal_declaration(signal, message.name))
-        signal_setters.append(f'    bool set_{signal.name}(const {_signal_physical_type(signal)}& value);')
+        signal_setters.append(f'{CPP_TAB}bool set_{signal.name}(const {_signal_physical_type(signal)}& value);')
+        signal_clearers.append(f'{CPP_TAB}void clear_{signal.name}();')
         signals.append(f'    {message.name}_{signal.name} {signal.name};')
 
     if message.comment is None:
@@ -474,7 +510,7 @@ def _generate_message_declaration(message):
                   f'    static const uint priority;\n'
     if message.protocol == 'j1939':
         static_vars += f'    static const uint32_t PGN;\n'
-    return signal_constructors, comment, signal_setters, signals, static_vars
+    return signal_constructors, comment, signal_setters, signal_clearers, signals, static_vars
 
 
 def _generate_constructor_params(signal):
@@ -580,7 +616,7 @@ def _generate_declarations(database_name, messages):
     classes = []
 
     for message in messages:
-        signal_constructors, comment, signal_setters, signals, static_vars = _generate_message_declaration(message)
+        signal_constructors, comment, signal_setters, signal_clearers, signals, static_vars = _generate_message_declaration(message)
         classes.append(
             MESSAGE_DECLARATION_FMT.format(
                 signal_constructors='\n'.join(signal_constructors),
@@ -588,6 +624,7 @@ def _generate_declarations(database_name, messages):
                 database_message_name=message.name,
                 message_name=message.snake_name,
                 signal_setters='\n'.join(signal_setters),
+                signal_clearers='\n'.join(signal_clearers),
                 signals='\n'.join(signals),
                 static_vars=static_vars))
 
@@ -681,9 +718,11 @@ def _generate_definitions(database_name, messages):
         signals_in_msg_constructor = []
         signal_definitions = []
         signal_setters = []
+        signal_clearers = []
 
         range_checks = _generate_is_in_range(message)
         pack = _format_pack_code(message)
+        clear = _format_clear_code(message)
         unpack = _format_unpack_code(message)
 
         for signal_iter, signal in enumerate(message.signals):
@@ -725,6 +764,11 @@ def _generate_definitions(database_name, messages):
                 physical_type=_signal_physical_type(signal),
                 contents = pack[signal.name]))
 
+            signal_clearers.append(SIGNAL_DEFINITION_CLEAR_FMT.format(
+                database_message_name=message.name,
+                name=signal.name,
+                contents = clear[signal.name]))
+
         cycle_time = message.cycle_time if message.cycle_time else '0'
         frame_id = '0x{:02x}'.format(message.frame_id)
         constructor = f'// Message {message.name}\n'
@@ -748,7 +792,8 @@ def _generate_definitions(database_name, messages):
             constructor=constructor,
             ostream=_message_ostream(message),
             static_vars=static_vars,
-            signal_setters='\n'.join(signal_setters))
+            signal_setters='\n'.join(signal_setters),
+            signal_clearers='\n'.join(signal_clearers))
 
         definitions.append(definition)
 
