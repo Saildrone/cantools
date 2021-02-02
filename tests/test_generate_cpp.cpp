@@ -10,7 +10,29 @@
 #include "signed.h"
 #include "vehicle.h"
 
-TEST(GenerateCpp, test_SetSignalsMultipleTimes_Vehicle_DBC) {
+TEST(GenerateCpp, test_ClearSignals_VehicleDBC) {
+    RT_DL1MK3_Speed s;
+    EXPECT_TRUE(s.set_Validity_Speed(1));
+    EXPECT_TRUE(s.set_Accuracy_Speed(100));
+    EXPECT_TRUE(s.set_Speed(-5555));
+
+    EXPECT_EQ(s.Speed.Real(), -5555);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 100);
+    EXPECT_EQ(s.Validity_Speed.Real(), 1);
+
+    s.clear_Accuracy_Speed();
+    EXPECT_EQ(s.Speed.Real(), -5555);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 0);
+    EXPECT_EQ(s.Validity_Speed.Real(), 1);
+
+    EXPECT_TRUE(s.set_Accuracy_Speed(10));
+    s.clear_Speed();
+    EXPECT_EQ(s.Speed.Real(), 0);
+    EXPECT_EQ(s.Accuracy_Speed.Real(), 10);
+    EXPECT_EQ(s.Validity_Speed.Real(), 1);
+}
+
+TEST(GenerateCpp, test_SetSignalsMultipleTimes_VehicleDBC) {
     RT_DL1MK3_Speed s;
     EXPECT_TRUE(s.set_Validity_Speed(1));
     EXPECT_TRUE(s.set_Accuracy_Speed(100));
@@ -63,7 +85,7 @@ TEST(GenerateCpp, test_SetSignalsMultipleTimes_Vehicle_DBC) {
 }
 
 // Copy struct pack/unpack in test_basic.motohawk_example_message_t
-TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
+TEST(GenerateCpp, test_StructUnpack_MotohawkDBC) {
     uint8_t buffer[] = "\xc0\x06\xe0\x00\x00\x00\x00\x00";
     ExampleMessage m(buffer, 8u);
 
@@ -73,9 +95,13 @@ TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
     EXPECT_EQ(55, m.Temperature.Raw());
 
     // Confirm buffer HexString() accuracy
-    auto str = m.HexString();
-    EXPECT_EQ(str, "c006e00000000000");
-    
+    auto hstr = m.HexString();
+    EXPECT_EQ(hstr, "c006e00000000000");
+
+    auto bstr = m.BinaryString();
+    std::cout << bstr << std::endl;
+    EXPECT_EQ(bstr, "11000000 00000110 11100000 00000000 00000000 00000000 00000000 00000000");
+
     // Confirm input buffer equal to buffer accessor
     auto output_buffer = m.buffer();
     for (size_t i = 0; i < 8; ++i) {
@@ -92,7 +118,7 @@ TEST(GenerateCpp, test_StructUnpack_Motohawk_DBC) {
     }
 }
 
-TEST(GenerateCpp, test_StructPack_Motohawk_DBC) {
+TEST(GenerateCpp, test_StructPack_MotohawkDBC) {
     ExampleMessage m;
 
     // Set Enable and confirm
@@ -111,19 +137,22 @@ TEST(GenerateCpp, test_StructPack_Motohawk_DBC) {
     EXPECT_EQ(250, m.Temperature.Real());
 }
 
-TEST(GenerateCpp, test_StructPack_Signed_DBC) {
+TEST(GenerateCpp, test_StructPack_SignedDBC) {
     Message64 m;
 
     EXPECT_TRUE(m.set_s64(-5));
     EXPECT_EQ(-5, m.s64.Raw());
     EXPECT_EQ(-5, m.s64.Real());
     EXPECT_EQ("fbffffffffffffff", m.HexString());
+    EXPECT_EQ("11111011 11111111 11111111 11111111 11111111 11111111 11111111 11111111", m.BinaryString());
 
     m.Clear();
     EXPECT_EQ("0000000000000000", m.HexString());
+    EXPECT_EQ("00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000", m.BinaryString());
+
 }
 
-TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939_DBC) {
+TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939DBC) {
     EEC1 eec1;
     CCVS1 ccvs1;
 
@@ -136,7 +165,7 @@ TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939_DBC) {
     EXPECT_EQ(CCVS1::PGN, 0xfef1);
 }
 
-TEST(GenerateCpp, test_OstreamOperator_Motohawk_DBC) {
+TEST(GenerateCpp, test_OstreamOperator_MotohawkDBC) {
     ExampleMessage m;
     m.set_Temperature(250);
     m.set_AverageRadius(0.25);
@@ -159,7 +188,7 @@ TEST(GenerateCpp, test_OstreamOperator_Motohawk_DBC) {
     EXPECT_EQ(os.str(), "Enable: 0  AverageRadius: 0.2 m  Temperature: 250 degK");
 }
 
-TEST(GenerateCpp, test_SignalStringType_String_DBC) {
+TEST(GenerateCpp, test_SignalStringType_StringDBC) {
     PersonName full_name;
     full_name.set_first_name("John");
     full_name.set_last_name("Doe");

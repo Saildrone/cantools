@@ -103,7 +103,10 @@ class Frame {
     std::ostringstream oss;
     for (size_t i = 0; i < data_length_; ++i) {
       std::bitset<8> bs(buffer_[i]);
-      oss << bs << " ";
+      oss << bs;
+      if (i < data_length_ - 1) {
+        oss << " ";
+      }
     }
     return oss.str();
   }
