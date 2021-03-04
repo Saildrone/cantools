@@ -219,6 +219,10 @@ TEST(GenerateCpp, test_SignalStringType_StringDBC) {
     os.str(std::string());
     os << full_name;
     EXPECT_EQ(os.str(), "first_name: Johnathan  age: 26 years  last_name: Doe  height: 67 inches  alive: true");
+
+    PersonName too_long;
+    too_long.set_first_name("Thisnameislongerthantwentycharacterssoitshouldtruncate");
+    EXPECT_EQ(too_long.first_name.Real(), "Thisnameislongerthan");
 }
 
 int main(int argc, char **argv) {

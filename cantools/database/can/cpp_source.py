@@ -318,12 +318,18 @@ def _format_pack_code_mux(message,
 
 def _format_pack_code_string(signal):
     start = signal.start // 8
-    body_lines = []
-    body_lines.append(f'{CPP_TAB}clear_{signal.name}();\n')
+    length = signal.length // 8
 
-    for index, _, _, _ in signal.segments(invert_shift=False):
-        body_lines.append(f'{CPP_TAB}buffer_[{index}] = value[{index - start}];')
-    body_lines.append(f'{CPP_TAB}return true;')
+    body_lines = [
+        f'{CPP_TAB}clear_{signal.name}();',
+        f'{CPP_TAB}int index = {start};',
+        f'{CPP_TAB}for (const auto& c : value) {{',
+        f'{CPP_TAB}{CPP_TAB}if (index >= {length + start}) {{ break; }}',
+        f'{CPP_TAB}{CPP_TAB}buffer_[index] = c;',
+        f'{CPP_TAB}{CPP_TAB}index++;',
+        f'{CPP_TAB}}}',
+        f'{CPP_TAB}return true;'
+    ]
     return '\n'.join(body_lines)
 
 
