@@ -454,8 +454,14 @@ def _format_unpack_code_string(signal):
     start = signal.start // 8
     body_lines = [
         f'{CPP_TAB}char buff[{length + 1}];',
-        f'{CPP_TAB}std::memcpy(buff, buffer_ + {start}, {length});',
-        f'{CPP_TAB}buff[{length}] = 0;',
+        f'{CPP_TAB}int index = 0;',
+        f'{CPP_TAB}while (index < {length}) {{',
+        f'{CPP_TAB}{CPP_TAB}char c = buffer_[index + {start}];',
+        f'{CPP_TAB}{CPP_TAB}if (c == (char)0xff || c == 0) {{ break; }}',
+        f'{CPP_TAB}{CPP_TAB}buff[index] = c;',
+        f'{CPP_TAB}{CPP_TAB}index++;',
+        f'{CPP_TAB}}}',
+        f'{CPP_TAB}buff[index] = 0;',
         f'{CPP_TAB}return std::string(buff);',
     ]
     return '\n'.join(body_lines)
