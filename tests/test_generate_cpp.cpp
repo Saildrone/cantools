@@ -158,7 +158,7 @@ TEST(GenerateCpp, test_SPNs_CSSElectronicsSAEJ1939DBC) {
 
     EXPECT_EQ(eec1.EngineSpeed.spn(), 190);
     EXPECT_EQ(ccvs1.WheelBasedVehicleSpeed.spn(), 84);
-    
+
     // Test static member vars
     EXPECT_EQ(EEC1::cycle_time_ms, 500);
     EXPECT_EQ(CCVS1::ID, 0x18fef1fe);
@@ -174,7 +174,7 @@ TEST(GenerateCpp, test_OstreamOperator_MotohawkDBC) {
     std::stringstream os;
     os << m.AverageRadius;
     EXPECT_EQ(os.str(), "0.2 m");
-    
+
     os.str(std::string());
     os << m.Temperature;
     EXPECT_EQ(os.str(), "250 degK");
@@ -190,7 +190,7 @@ TEST(GenerateCpp, test_OstreamOperator_MotohawkDBC) {
 
 TEST(GenerateCpp, test_SignalStringType_StringDBC) {
     PersonName full_name;
-    full_name.set_first_name("John");
+    full_name.set_first_name("Johnathan");
     full_name.set_last_name("Doe");
     full_name.set_height(67);
     full_name.set_age(26);
@@ -198,7 +198,7 @@ TEST(GenerateCpp, test_SignalStringType_StringDBC) {
 
     std::stringstream os;
     os << full_name.first_name;
-    EXPECT_EQ(os.str(), "John");
+    EXPECT_EQ(os.str(), "Johnathan");
 
     os.str(std::string());
     os << full_name.last_name;
@@ -218,7 +218,11 @@ TEST(GenerateCpp, test_SignalStringType_StringDBC) {
 
     os.str(std::string());
     os << full_name;
-    EXPECT_EQ(os.str(), "first_name: John  age: 26 years  last_name: Doe  height: 67 inches  alive: true");
+    EXPECT_EQ(os.str(), "first_name: Johnathan  age: 26 years  last_name: Doe  height: 67 inches  alive: true");
+
+    PersonName too_long;
+    too_long.set_first_name("Thisnameislongerthantwentycharacterssoitshouldtruncate");
+    EXPECT_EQ(too_long.first_name.Real(), "Thisnameislongerthan");
 }
 
 int main(int argc, char **argv) {

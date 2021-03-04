@@ -270,10 +270,12 @@ class Signal<RawDataType, std::string> {
   virtual RawDataType Raw() const = 0;
 
   /** Confirm if raw signal within acceptable range */
-  virtual bool RawInRange(const RawDataType& value) const = 0;  
+  virtual bool RawInRange(const RawDataType& value) const = 0;
 
   /** Unpacked signal from buffer, decoded and converted to physical engineering units */
-  std::string Real() const { return Decode(Raw()); }
+  std::string Real() const {
+    return Raw();
+  }
 
   /** Confirm if physical engineering units value in range */
   bool InRange(const std::string& value) const {
@@ -281,11 +283,9 @@ class Signal<RawDataType, std::string> {
     return RawInRange(raw);
   }
 
-  /** Decode given signal by applying scaling and offset. */
+  /** This is a no-op for string-string conversion! */
   std::string Decode(RawDataType value) const {
-    std::string out(reinterpret_cast<const char*>(&value), sizeof(value));
-    out.resize(strlen(out.c_str()));
-    return out;
+    return value;
   }
 
   /** Encode given signal by applying scaling and offset. */
