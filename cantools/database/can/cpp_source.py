@@ -236,11 +236,19 @@ def _format_comment_no_tabs(comment):
 # If this is done then can use signal.type_name, with some simple code to determine if the signal is
 # a boolean (1 bit size). Then can make use of Signal template param PhysicalDataType accurately, as
 # well as hardcode the `std::ostream& operator<<(` with partial template specialization.
+
+def _is_string_signal(signal):
+    return signal.unit and (signal.unit.lower() == 'string' or signal.unit.lower() == 'str')
+
 def _signal_physical_type(signal):
-    if signal.unit and (signal.unit.lower() == 'string' or signal.unit.lower() == 'str'):
+    if _is_string_signal(signal):
         return 'std::string'
     return 'double'
 
+def _signal_raw_type(signal):
+    if _is_string_signal(signal):
+        return 'std::string'
+    return signal.type_name
 
 def _generate_signal_declaration(signal, message_name):
     comment = _format_comment_no_tabs(signal.comment)
@@ -261,7 +269,7 @@ def _generate_signal_declaration(signal, message_name):
                                            scale=scale,
                                            offset=offset,
                                            additional_comments=_format_comment_no_tabs(additional_comments),
-                                           type_name=signal.type_name,
+                                           type_name=_signal_raw_type(signal),
                                            physical_type=_signal_physical_type(signal))
     return member
 
@@ -308,8 +316,22 @@ def _format_pack_code_mux(message,
     return [('    ' + line).rstrip() for line in lines]
 
 
+def _format_pack_code_string(signal):
+    start = signal.start // 8
+    body_lines = []
+    body_lines.append(f'{CPP_TAB}clear_{signal.name}();\n')
+
+    for index, _, _, _ in signal.segments(invert_shift=False):
+        body_lines.append(f'{CPP_TAB}buffer_[{index}] = value[{index - start}];')
+    body_lines.append(f'{CPP_TAB}return true;')
+    return '\n'.join(body_lines)
+
+
 def _format_pack_code_signal(message, signal_name):
     signal = message.get_signal_by_name(signal_name)
+    if _is_string_signal(signal):
+        return _format_pack_code_string(signal)
+
     fmt = '    uint{}_t {}_encoded = {}.Encode(value);\n'
     pack_content = fmt.format(signal.type_length,
                               signal.snake_name,
@@ -421,10 +443,24 @@ def _format_unpack_code_mux(message,
 
     return [('    ' + line).rstrip() for line in lines]
 
+def _format_unpack_code_string(signal):
+    length = signal.length // 8
+    start = signal.start // 8
+    body_lines = [
+        f'{CPP_TAB}char buff[{length + 1}];',
+        f'{CPP_TAB}std::memcpy(buff, buffer_ + {start}, {length});',
+        f'{CPP_TAB}buff[{length}] = 0;',
+        f'{CPP_TAB}return std::string(buff);',
+    ]
+    return '\n'.join(body_lines)
+
 
 def _format_unpack_code_signal(message,
                                signal_name):
     signal = message.get_signal_by_name(signal_name)
+    if _is_string_signal(signal):
+        return _format_unpack_code_string(signal)
+
     conversion_type_name = 'uint{}_t'.format(signal.type_length)
     fmt = '    uint{}_t {} = 0{};\n'
     pack_content = fmt.format(signal.type_length,
@@ -537,6 +573,10 @@ def _generate_is_in_range(message):
     checks = []
 
     for signal in message.signals:
+        if _is_string_signal(signal):
+            checks.append('true')
+            continue
+
         scale = signal.decimal.scale
         offset = (signal.decimal.offset / scale)
         minimum = signal.decimal.minimum
@@ -747,13 +787,13 @@ def _generate_definitions(database_name, messages):
             signal_definition += SIGNAL_DEFINITION_RAW_FMT.format(
                 name=signal.name,
                 message_name=message.name,
-                type_name=signal.type_name,
+                type_name=_signal_raw_type(signal),
                 contents = unpack[signal.name])
 
             signal_definition += SIGNAL_DEFINITION_RAW_IN_RANGE_FMT.format(
                 name=signal.name,
                 message_name=message.name,
-                type_name=signal.type_name,
+                type_name=_signal_raw_type(signal),
                 check=range_checks[signal_iter])
 
             signal_definitions.append(signal_definition)
